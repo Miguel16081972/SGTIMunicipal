@@ -1,0 +1,142 @@
+/* ===== SGTI Municipal — Reportes WhatsApp Styles ===== */
+
+.reportes-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+}
+
+/* REPORTE CARD */
+.reporte-card {
+  background: var(--card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all .2s;
+  animation: cardIn .3s ease both;
+}
+.reporte-card:hover {
+  border-color: var(--blue);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0,0,0,.1);
+}
+
+.rpt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.rpt-id-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rpt-id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--glass);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
+.rpt-time {
+  color: var(--text-muted);
+}
+
+.rpt-body {
+  margin-bottom: 8px;
+}
+
+.rpt-mensaje {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.rpt-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 10px;
+  color: var(--text-dim);
+  padding-top: 8px;
+  border-top: 1px solid var(--border-light);
+}
+
+.rpt-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* ACTION BUTTONS */
+.rpt-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-light);
+}
+
+.rpt-action-btn {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  border: 1px solid var(--border-light);
+  background: var(--glass);
+  color: var(--text-dim);
+  transition: all .15s;
+}
+.rpt-action-btn:hover {
+  transform: translateY(-1px);
+}
+
+.rpt-btn-proceso {
+  border-color: rgba(251,191,36,.3);
+  color: var(--amber);
+}
+.rpt-btn-proceso:hover {
+  background: rgba(251,191,36,.1);
+  border-color: var(--amber);
+}
+
+.rpt-btn-atendido {
+  border-color: rgba(52,211,153,.3);
+  color: var(--green);
+}
+.rpt-btn-atendido:hover {
+  background: rgba(52,211,153,.1);
+  border-color: var(--green);
+}
+
+.rpt-btn-nuevo {
+  border-color: rgba(248,113,113,.3);
+  color: var(--red);
+}
+.rpt-btn-nuevo:hover {
+  background: rgba(248,113,113,.1);
+  border-color: var(--red);
+}
+
+/* Stagger animation for report cards */
+.reporte-card:nth-child(1) { animation-delay: .02s }
+.reporte-card:nth-child(2) { animation-delay: .04s }
+.reporte-card:nth-child(3) { animation-delay: .06s }
+.reporte-card:nth-child(4) { animation-delay: .08s }
+.reporte-card:nth-child(5) { animation-delay: .10s }
+.reporte-card:nth-child(6) { animation-delay: .12s }
+.reporte-card:nth-child(7) { animation-delay: .14s }

@@ -1,0 +1,39 @@
+GUÍA DE DESPLIEGUE EN HOSTINGER - SGTI MUNICIPAL
+==================================================
+
+¡Felicidades! Todo el proyecto ha sido empaquetado para que sea muy fácil de subir a Hostinger. 
+Dado que el frontend (Vite) ya fue compilado, ahora cuentas con una sola carpeta que trae todo integrado: El Servidor, la Seguridad, el Bot de WhatsApp y la Interfaz Visual.
+
+Paso 1: Preparar la subida
+--------------------------------------------------
+Sube esta carpeta entera (`backend`) o este archivo ZIP a tu Administrador de Archivos en Hostinger, dentro de la ruta donde instalarás la app de Node.js (NO lo metas dentro de `public_html`).
+
+Paso 2: Configurar Node.js en Hostinger
+--------------------------------------------------
+1. Ve al menú de Hostinger -> Avanzado -> Aplicaciones Node.js (Si tienes VPS, omite y despliega normal).
+2. Crea una nueva aplicación Node.js.
+3. Carpeta de la aplicación: La carpeta donde subiste esto (ej. `/sgti-backend`).
+4. Archivo de inicio (Startup file): `server.js`
+
+Paso 3: Variables de Entorno (IMPORTANTE)
+--------------------------------------------------
+Dentro de tu panel de Hostinger, asegúrate de que el archivo `.env` que subiste mantenga tus credenciales originales de base de datos que configuramos:
+
+DB_HOST=localhost (Si Hostinger te dio localhost para la BD, o usa su IP local).
+DB_PORT=3306
+DB_NAME=Kuki_Carmen
+DB_USER=Kukicarmen
+DB_PASS=TECNOlogia2026.$
+DB_DIALECT=mysql
+
+Paso 4: Instalar las librerías
+--------------------------------------------------
+En el entorno de Node.js de Hostinger, asegúrate de correr el comando para instalar todo:
+> npm install
+
+Paso 5: ¡Listo!
+--------------------------------------------------
+Inicia la aplicación (START). Ahora todo el SGTI funcionará a través del dominio que asimilaste en Hostinger.
+La interfaz web (frontend) y las rutas internas de API y Bot ahora corren desde un mismo lugar.
+
+*NOTA:* Cuando el servidor corra por primera vez, verás el código QR de WhatsApp entrando a tu dominio en /Central WhatsApp -> Conexión. Escanéalo y el Bot vinculará a la BD.

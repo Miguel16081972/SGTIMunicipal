@@ -1,0 +1,78 @@
+/* ===== SGTI Municipal — Sidebar =====*/
+
+#sidebar{
+  width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--sidebar);
+  border-right:1px solid var(--border-light);display:flex;flex-direction:column;
+  overflow-y:auto;overflow-x:hidden;transition:all .3s cubic-bezier(.4,0,.2,1);
+  position:relative;z-index:10;
+}
+#sidebar.collapsed{width:64px;min-width:64px}
+#sidebar.collapsed .sb-hide{display:none}
+#sidebar.collapsed .nav-item{justify-content:center;padding:10px}
+#sidebar.collapsed .nav-item .dot{width:12px;height:12px}
+
+.sidebar-header{
+  padding:16px;border-bottom:1px solid var(--border-light);
+  display:flex;align-items:center;gap:10px;
+}
+.logo-icon{
+  width:44px;height:44px;min-width:44px;
+  background:transparent;
+  border-radius:10px;display:flex;align-items:center;justify-content:center;
+  box-shadow:none;
+}
+.logo-icon svg{width:18px;height:18px;fill:#000;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.1))}
+.sidebar-header h1{font-size:16px;font-weight:900;letter-spacing:-.6px;color:#000}
+.sidebar-header p{font-size:10px;color:rgba(0,0,0,.8);margin-top:1px;font-weight:600}
+
+#sidebar-toggle{
+  position:absolute;top:20px;right:12px;width:24px;height:24px;
+  background:transparent;border:1px solid #000;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  color:#000;font-size:11px;z-index:20;transition:all .2s;
+}
+#sidebar-toggle:hover{transform:scale(1.1);background:transparent;}
+#sidebar.collapsed #sidebar-toggle{transform:rotate(180deg)}
+
+.nav-section{
+  padding:14px 16px 4px;font-size:9px;font-weight:700;color:rgba(0,0,0,.5) !important;
+  text-transform:uppercase;letter-spacing:1.2px;
+}
+.nav-item{
+  display:flex;align-items:center;gap:12px;padding:9px 16px;margin:2px 8px;
+  border-radius:var(--radius-sm);cursor:pointer;transition:all .2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size:12px;font-weight:800 !important;color:#000 !important;position:relative;
+  background:transparent !important;
+  border:1px solid transparent;
+}
+.nav-item:hover{background:rgba(255,255,255,.2) !important;border-color:rgba(0,0,0,.1) !important}
+.nav-item.active{
+  background:rgba(255,255,255,.4) !important;
+  color:#000 !important;
+  font-weight:900 !important;
+  border:2px solid #000 !important;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1) !important;
+}
+.nav-item.active::before{
+  content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:4px;height:16px;background:#000;border-radius:0 4px 4px 0;
+}
+.nav-item .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#000 !important;border:1px solid rgba(255,255,255,0.2)}
+
+.nav-sub{margin-left:26px;border-left:1px solid rgba(0,0,0,.1)}
+.nav-sub .nav-item{font-size:11px;padding:5px 12px;margin:0 6px 0 0;color:#000 !important}
+.nav-sub .nav-item::before{display:none}
+
+.gerencia-toggle{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:7px 14px;margin:1px 6px;border-radius:var(--radius-sm);
+  cursor:pointer;font-size:12px;font-weight:700 !important;color:#000 !important;
+  background:transparent !important;transition:all .15s;
+}
+.gerencia-toggle:hover{background:rgba(255,255,255,.2) !important}
+.gerencia-toggle.open{color:#000 !important;background:rgba(255,255,255,.1) !important}
+.gerencia-toggle .arrow{transition:transform .2s;font-size:9px;opacity:.8;color:#000 !important}
+.gerencia-toggle.open .arrow{transform:rotate(90deg);opacity:1}
+
+.nav-sub.collapsed{max-height:0;overflow:hidden;transition:max-height .25s}
+.nav-sub{max-height:200px;transition:max-height .25s}

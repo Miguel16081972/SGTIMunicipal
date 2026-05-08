@@ -1,0 +1,16 @@
+# Dependencias
+node_modules/
+android/app/build/
+android/.gradle/
+www/
+dist/
+build/
+.env
+.idea/
+.vscode/
+
+# Sesiones de BOT y bases de datos pesadas (Imagen corregida)
+backend/bot-session/
+*.db
+*.sqlite
+session/
