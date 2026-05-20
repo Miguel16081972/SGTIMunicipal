@@ -192,7 +192,8 @@ const initWhatsAppBot = () => {
           manualMap[m.remoteId] = { areaId: m.areaId, monitoreado: m.monitoreado };
         });
 
-        connectedGroups = groups.map(g => {
+        connectedGroups = [];
+        for (const g of groups) {
           const remoteId = g.id._serialized;
           const manual = manualMap[remoteId];
           
@@ -209,10 +210,20 @@ const initWhatsAppBot = () => {
             if (areaMatch) {
               areaId = areaMatch[0];
               isMonitored = true;
+              // AUTO-VINCULAR EN BD — ¡ESTO SOLUCIONA EL PROBLEMA!
+              try {
+                await Models.GrupoVinculado.create({
+                  remoteId: remoteId,
+                  nombre: g.name,
+                  areaId: areaId,
+                  monitoreado: true
+                });
+                console.log(`✨ Grupo auto-vinculado: ${g.name} -> ${areaId}`);
+              } catch (e) { /* Ya existe o error menor */ }
             }
           }
 
-          return {
+          connectedGroups.push({
             name: g.name || 'Grupo sin nombre',
             id: remoteId,
             participants: g.participants?.length || 0,
@@ -220,18 +231,15 @@ const initWhatsAppBot = () => {
             isManual: !!manual,
             area: areaId,
             areaNombre: areaId ? (GRUPOS_CONFIG[areaId]?.nombre || areaId) : 'No vinculado',
-          };
-        });
+          });
+        }
+
+        // Sincronizar cache de clasificación inmediatamente
+        const { syncGruposVinculados } = require('./classifier');
+        await syncGruposVinculados();
 
         const monitored = connectedGroups.filter(g => g.isMonitored);
-        console.log(`  📋 ${groups.length} grupos encontrados, ${monitored.length} monitoreados:`);
-        monitored.forEach(g => {
-          console.log(`     ✅ "${g.name}" → ${g.areaNombre}`);
-        });
-        const unmonitored = connectedGroups.filter(g => !g.isMonitored);
-        if (unmonitored.length > 0) {
-          console.log(`     ⚪ ${unmonitored.length} grupos no vinculados`);
-        }
+        console.log(`  📋 ${groups.length} grupos encontrados, ${monitored.length} monitoreados.`);
         console.log('');
       } catch (err) {
         console.error('Error listando grupos:', err.message);
@@ -277,8 +285,11 @@ const initWhatsAppBot = () => {
 
       // Registrar solo grupos vinculados y monitoreados
       const remoteId = chat.id._serialized;
-      if (chat.isGroup && !isMonitoredGroup(chatName, remoteId)) {
-        return; // Ignorar totalmente si no está vinculado/activo
+      const monitored = isMonitoredGroup(chatName, remoteId);
+      
+      if (chat.isGroup && !monitored) {
+        console.log(`ℹ️ Mensaje ignorado (Grupo no activo): [${chatName}] - ID: ${remoteId}`);
+        return; 
       }
 
       // Ignorar estados y mensajes de solo media sin texto

@@ -66,6 +66,9 @@ router.post('/', async (req, res) => {
   }
 
   const { fotoUrl } = req.body;
+  if (fotoUrl) {
+    console.log(`📸 Foto recibida [${id}]. Longitud: ${fotoUrl.length} caracteres.`);
+  }
 
   const nuevoReporte = {
     idString: id,

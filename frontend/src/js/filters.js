@@ -17,6 +17,9 @@ export function applyFilters() {
 
 export function resetFilters() {
   const now = new Date();
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(now.getDate() - 30);
+
   const formatDate = (d) => {
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -25,7 +28,7 @@ export function resetFilters() {
   };
 
   document.getElementById('filter-sector').value = 'all';
-  document.getElementById('filter-from').value = formatDate(now);
+  document.getElementById('filter-from').value = formatDate(thirtyDaysAgo);
   document.getElementById('filter-to').value = formatDate(now);
   
   logActivity('Filtros reseteados');

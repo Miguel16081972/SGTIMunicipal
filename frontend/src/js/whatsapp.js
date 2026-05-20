@@ -52,7 +52,7 @@ export async function renderWspFeed(grupo) {
           <span class="badge ${m.estado==='atendido'?'badge-green':(m.estado==='en_proceso'?'badge-amber':'badge-red')}">${m.estado.toUpperCase()}</span>
         </div>
         <div class="fi-body">${m.mensaje}</div>
-        ${m.fotoUrl ? `<div class="fi-img-wrap" style="margin-top:10px; margin-bottom:12px;"><img src="${m.fotoUrl}" style="width:120px; height:120px; object-fit:cover; border-radius:12px; cursor:zoom-in; border:2px solid var(--blue); box-shadow: 0 4px 15px rgba(0,0,0,0.2)" onclick="window.open('${m.fotoUrl}', '_blank')"></div>` : ''}
+        ${m.fotoUrl ? `<div class="fi-img-wrap" style="margin-top:10px; margin-bottom:12px;"><img src="${m.fotoUrl.startsWith('data:') ? m.fotoUrl : 'data:image/jpeg;base64,' + m.fotoUrl}" style="width:120px; height:120px; object-fit:cover; border-radius:12px; cursor:zoom-in; border:2px solid var(--blue); box-shadow: 0 4px 15px rgba(0,0,0,0.2)" onclick="window.open('${m.fotoUrl.startsWith('data:') ? m.fotoUrl : 'data:image/jpeg;base64,' + m.fotoUrl}', '_blank')"></div>` : ''}
         ${m.ubicacion ? `<div class="fi-loc">📍 ${m.ubicacion}</div>` : ''}
         <div class="fi-actions">
            <button class="btn btn-ghost" style="font-size:10px;padding:2px 8px" onclick="verReporte('${m.id}')">Gestionar →</button>
@@ -406,6 +406,15 @@ export async function verReporte(id) {
           ${r.mensaje}
         </div>
       </div>
+
+      ${r.fotoUrl ? `
+      <div style="margin-bottom:20px;">
+        <div style="font-size:10px; color:var(--text-muted); font-weight:700; margin-bottom:8px;">EVIDENCIA FOTOGRÁFICA</div>
+        <div style="text-align:center; background:rgba(0,0,0,0.2); border-radius:12px; padding:10px; border:1px solid rgba(255,255,255,0.05)">
+          <img src="${r.fotoUrl.startsWith('data:') ? r.fotoUrl : 'data:image/jpeg;base64,' + r.fotoUrl}" style="max-width:100%; max-height:400px; border-radius:8px; cursor:zoom-in; box-shadow:0 10px 30px rgba(0,0,0,0.5)" onclick="window.open('${r.fotoUrl.startsWith('data:') ? r.fotoUrl : 'data:image/jpeg;base64,' + r.fotoUrl}', '_blank')">
+        </div>
+      </div>
+      ` : ''}
 
       <div style="margin-bottom:20px; padding:16px; background:rgba(79,143,247,0.05); border-radius:12px; border:1px solid rgba(79,143,247,0.2)">
         <div style="font-size:10px; color:var(--blue); font-weight:800; margin-bottom:12px;">📍 UBICACIÓN Y GESTIÓN</div>

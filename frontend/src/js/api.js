@@ -1,6 +1,6 @@
 // ===== SGTI Municipal — API Layer =====
 const API_BASE = (window.Capacitor && window.Capacitor.isNativePlatform()) 
-  ? 'https://app.gobernanzamunicipal.com/api' 
+  ? 'https://sgti-municipal.com/api' // Reemplazar con tu dominio real de Hostinger
   : '/api';
 
 class API {

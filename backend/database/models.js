@@ -76,7 +76,7 @@ const MensajeWhatsapp = sequelize.define('MensajeWhatsapp', {
   estado: { type: DataTypes.STRING(20), defaultValue: 'nuevo' },
   asignadoA: { type: DataTypes.STRING(100) },
   notas: { type: DataTypes.TEXT },
-  fotoUrl: { type: DataTypes.STRING(255) },
+  fotoUrl: { type: DataTypes.TEXT('long') },
   areasDerivadas: { type: DataTypes.TEXT },             // JSON array de áreas derivadas
   esDerivacionMultiple: { type: DataTypes.BOOLEAN, defaultValue: false },
 }, { timestamps: true });

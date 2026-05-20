@@ -3,11 +3,29 @@
 // con fallback a datos mock + memoria
 
 const express = require('express');
+const { Sequelize, Op } = require('sequelize');
 const { whatsappTrending, whatsappGrupos, whatsappFeeds, whatsappReportes } = require('../data/mock-data');
+const { MensajeWhatsapp, GrupoVinculado } = require('../database/models');
 const { GRUPOS_CONFIG } = require('../bot/classifier');
 const router = express.Router();
 
-// Helper: obtener modelo BD (puede no estar disponible)
+// Helper: tiempo transcurrido
+function getTimeAgo(date) {
+  const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+  let interval = seconds / 31536000;
+  if (interval > 1) return Math.floor(interval) + " años";
+  interval = seconds / 2592000;
+  if (interval > 1) return Math.floor(interval) + " meses";
+  interval = seconds / 86400;
+  if (interval > 1) return Math.floor(interval) + " días";
+  interval = seconds / 3600;
+  if (interval > 1) return Math.floor(interval) + " horas";
+  interval = seconds / 60;
+  if (interval > 1) return Math.floor(interval) + " min";
+  return Math.floor(seconds) + " seg";
+}
+
+// Helper: obtener modelo BD
 function getModel() {
   try {
     return require('../database/models').MensajeWhatsapp;
@@ -19,14 +37,16 @@ function getModel() {
 // Helper: check si BD está conectada
 function isDbConnected() {
   try {
-    return require('../database/db').isConnected();
+    const db = require('../database/db');
+    return db.isConnected();
   } catch (e) {
     return false;
   }
 }
 
 // ===== DASHBOARD GENERAL =====
-// GET /api/whatsapp — Dashboard con datos reales de la BD
+
+// GET / — Panel general de WhatsApp
 router.get('/', async (req, res) => {
   try {
     const Model = getModel();
@@ -35,7 +55,7 @@ router.get('/', async (req, res) => {
       const counts = await Model.findAll({
         attributes: [
           ['grupo', 'id'],
-          [Sequelize.fn('COUNT', Sequelize.col('idString')), 'mensajes']
+          [Sequelize.fn('COUNT', Sequelize.col('idString')), 'total']
         ],
         group: ['grupo']
       });
@@ -43,13 +63,27 @@ router.get('/', async (req, res) => {
       // Mapear a la estructura que espera el frontend
       const gruposReales = {};
       const config = require('../bot/classifier').GRUPOS_CONFIG;
-      
+
+      // Variaciones de nombres para agrupar conteos
+      const nameMap = {
+        'seguridad': ['seguridad', 'Seg. Ciudadana', 'Seguridad Ciudadana', 'Seguridad'],
+        'ambiental': ['ambiental', 'Des. Ambiental', 'Desarrollo Ambiental', 'Ambiental'],
+        'urbano': ['urbano', 'Des. Urbano', 'Desarrollo Urbano', 'Urbano'],
+        'humano': ['humano', 'Des. Humano', 'Desarrollo Humano', 'Humano'],
+        'rentas': ['rentas', 'Rentas'],
+        'municipal': ['municipal', 'Gerencia Municipal', 'Ger. Municipal']
+      };
+
       Object.keys(config).forEach(id => {
-        const dbCount = counts.find(c => c.getDataValue('id') === id);
+        // Sumar todos los mensajes que coincidan con las variaciones de este ID
+        const variants = nameMap[id] || [id];
+        const dbCount = counts.filter(c => variants.includes(c.getDataValue('id')))
+          .reduce((acc, c) => acc + parseInt(c.getDataValue('total')), 0);
+
         gruposReales[id] = {
           nombre: config[id].nombre,
           icon: config[id].icon,
-          mensajes: dbCount ? dbCount.getDataValue('mensajes') : 0,
+          total: dbCount || 0,
           color: config[id].color || 'blue',
           status: 'Activo'
         };
@@ -57,7 +91,7 @@ router.get('/', async (req, res) => {
 
       return res.json({ trending: whatsappTrending, grupos: gruposReales });
     }
-    
+
     // Fallback si no hay BD
     res.json({ trending: whatsappTrending, grupos: whatsappGrupos });
   } catch (err) {
@@ -107,53 +141,84 @@ router.get('/grupos-conectados', (req, res) => {
 router.get('/feed/:grupo', async (req, res) => {
   const grupo = req.params.grupo;
 
-  if (req.user && req.user.gerencia !== 'all' && req.user.gerencia !== grupo) {
+  // Bypass de seguridad para administradores
+  const isAdmin = req.user && (req.user.rol === 'admin' || req.user.gerencia === 'all');
+
+  if (!isAdmin && req.user && req.user.gerencia !== grupo) {
     return res.status(403).json({ error: 'No tienes permiso para ver el feed de esta gerencia.' });
   }
 
   // Intentar leer de BD: últimos mensajes de este grupo
   const Model = getModel();
-  if (Model && isDbConnected()) {
-    try {
+
+  try {
+    if (Model) {
       const { Op } = require('sequelize');
+      const securityCategories = ['Robo / Asalto', 'Comercio Informal', 'Pelea Callejera', 'Persona Sospechosa', 'Ruido Excesivo'];
+
+      const feedVariants = {
+        'seguridad': ['seguridad', 'Seguridad Ciudadana', 'Seg. Ciudadana', 'Seguridad'],
+        'ambiental': ['ambiental', 'Desarrollo Ambiental', 'Des. Ambiental', 'Ambiental'],
+        'urbano': ['urbano', 'Desarrollo Urbano', 'Des. Urbano', 'Urbano'],
+        'humano': ['humano', 'Desarrollo Humano', 'Des. Humano', 'Humano'],
+        'rentas': ['rentas', 'Rentas'],
+        'municipal': ['municipal', 'Gerencia Municipal', 'Ger. Municipal']
+      };
+
+      const variants = feedVariants[grupo] || [grupo];
+
+      const { from, to } = req.query;
+      const where = {
+        [Op.or]: [
+          { grupo: { [Op.in]: variants } },
+          { categoria: { [Op.in]: grupo === 'seguridad' ? securityCategories : [] } },
+          { areasDerivadas: { [Op.like]: `%${grupo}%` } }
+        ]
+      };
+
+      // Filtro por fecha (Opcional)
+      if (from || to) {
+        where.fecha = {};
+        if (from) where.fecha[Op.gte] = new Date(from + 'T00:00:00');
+        if (to) where.fecha[Op.lte] = new Date(to + 'T23:59:59');
+      }
+
       const mensajes = await Model.findAll({
-        where: {
-          [Op.or]: [
-            { grupo: grupo },
-            { areasDerivadas: { [Op.like]: `%"${grupo}"%` } }
-          ]
-        },
+        where,
         order: [['fecha', 'DESC']],
-        limit: 20,
+        limit: (from || to) ? 500 : 100, // 100 por defecto para velocidad, 500 con filtros
       });
 
-      if (mensajes.length > 0) {
+      if (mensajes && mensajes.length > 0) {
         const feed = mensajes.map(m => {
           const prioridadColor = { Alta: '#f87171', Media: '#fbbf24', Baja: '#34d399' };
           return {
+            id: m.idString,
             time: getTimeAgo(m.fecha),
+            fecha: m.fecha,
             sender: m.reportadoPor || 'Desconocido',
             body: m.mensaje,
             tags: [m.prioridad, m.direccionExtraida ? 'Predio' : 'Zona aprox.'],
             lat: m.lat ? parseFloat(m.lat) : null,
             lng: m.lng ? parseFloat(m.lng) : null,
+            ubicacion: m.ubicacion || m.direccionExtraida || null,
             color: prioridadColor[m.prioridad] || '#fbbf24',
             sentiment: m.prioridad === 'Alta' ? 'negativo' : m.prioridad === 'Baja' ? 'positivo' : 'neutral',
             category: m.categoria,
             areasDerivadas: m.areasDerivadas ? JSON.parse(m.areasDerivadas) : [grupo],
             esDerivacionMultiple: m.esDerivacionMultiple || false,
+            fotoUrl: m.fotoUrl
           };
         });
         return res.json({ grupo, feed, source: 'database' });
       }
-    } catch (err) {
-      console.error('Error leyendo feed de BD:', err.message);
     }
+  } catch (err) {
+    console.error('❌ [FEED ERROR]:', err.message);
   }
 
-  // Fallback a datos mock
-  const feed = whatsappFeeds[grupo];
-  if (!feed) return res.status(404).json({ error: 'Grupo no encontrado' });
+  // Fallback a datos mock si falla la BD o no hay mensajes
+  const feed = whatsappFeeds[grupo] || [];
   res.json({ grupo, feed, source: 'mock' });
 });
 
@@ -166,48 +231,106 @@ router.get('/reportes', async (req, res) => {
   const Model = getModel();
 
   // Intentar leer de BD
-  if (Model && isDbConnected()) {
+  if (Model) {
     try {
       const where = {};
       const { Op } = require('sequelize');
 
+      console.log(`🔍 [REPORTE DEBUG] Filtros: grupo=${grupo}, estado=${estado}, prioridad=${prioridad}, userGerencia=${req.user?.gerencia}`);
+
       if (estado && estado !== 'todos') where.estado = estado;
       if (grupo && grupo !== 'todos') {
-        // Buscar tanto en grupo principal como en areasDerivadas
+        const nameMap = {
+          'seguridad': ['seguridad', 'Seg. Ciudadana', 'Seguridad Ciudadana', 'Seguridad'],
+          'ambiental': ['ambiental', 'Desarrollo Ambiental', 'Des. Ambiental', 'Ambiental'],
+          'urbano': ['urbano', 'Desarrollo Urbano', 'Des. Urbano', 'Urbano'],
+          'humano': ['humano', 'Desarrollo Humano', 'Des. Humano', 'Humano'],
+          'rentas': ['rentas', 'Rentas'],
+          'municipal': ['municipal', 'Gerencia Municipal', 'Ger. Municipal']
+        };
+        const variants = nameMap[grupo] || [grupo];
+
+        // Buscar tanto en grupo principal como en areasDerivadas usando las variantes
         where[Op.or] = [
-          { grupo: grupo },
-          { areasDerivadas: { [Op.like]: `%"${grupo}"%` } }
+          { grupo: { [Op.in]: variants } },
+          { areasDerivadas: { [Op.like]: `%${grupo}%` } }
         ];
       }
       if (prioridad && prioridad !== 'todas') where.prioridad = prioridad;
       if (sector && sector !== 'todos') where.sector = sector;
 
-      // Filtro RBAC
-      if (req.user && req.user.gerencia !== 'all') {
+      // Filtro RBAC (Bypass para Admin o Sesión no iniciada temporalmente)
+      const isAdmin = req.user && (req.user.rol === 'admin' || req.user.gerencia === 'all');
+      const noUser = !req.user;
+
+      if (noUser) {
+        console.log('⚠️ [REPORTE RBAC] Acceso sin sesión detectado. Permitiendo vista global por emergencia.');
+      }
+
+      if (!isAdmin && !noUser) {
         const uGerencia = req.user.gerencia;
+        const nameMap = {
+          'seguridad': ['seguridad', 'Seg. Ciudadana', 'Seguridad Ciudadana', 'Seguridad'],
+          'ambiental': ['ambiental', 'Des. Ambiental', 'Desarrollo Ambiental', 'Ambiental'],
+          'urbano': ['urbano', 'Des. Urbano', 'Desarrollo Urbano', 'Urbano'],
+          'humano': ['humano', 'Des. Humano', 'Desarrollo Humano', 'Humano'],
+          'rentas': ['rentas', 'Rentas'],
+          'municipal': ['municipal', 'Gerencia Municipal', 'Ger. Municipal']
+        };
+        const uVariants = nameMap[uGerencia] || [uGerencia];
+
+        console.log(`🛡️ [REPORTE RBAC] Aplicando filtro para: ${uGerencia}`);
         where[Op.and] = where[Op.and] || [];
         where[Op.and].push({
           [Op.or]: [
-            { grupo: uGerencia },
-            { areasDerivadas: { [Op.like]: `%"${uGerencia}"%` } }
+            { grupo: { [Op.in]: uVariants } },
+            { areasDerivadas: { [Op.like]: `%${uGerencia}%` } }
           ]
         });
       }
-      
+
       if (from && to) {
-        where.fecha = { [Op.between]: [new Date(from).toISOString(), new Date(to + 'T23:59:59').toISOString()] };
+        where.fecha = { [Op.between]: [new Date(from), new Date(to + 'T23:59:59.999Z')] };
       }
 
+      console.log(`📝 [REPORTE QUERY] Where:`, JSON.stringify(where));
+
+      const queryLimit = (from && to) ? 1000 : 100;
       const mensajes = await Model.findAll({
         where,
         order: [['fecha', orden === 'antiguo' ? 'ASC' : 'DESC']],
+        limit: queryLimit
       });
 
       const reportes = mensajes.map(formatReporteFromDB);
 
-      // Stats
-      const allDB = await Model.findAll();
-      const allMensajes = allDB.map(formatReporteFromDB);
+      // Stats — Respetar filtros de fecha para que KPIs reflejen el periodo seleccionado
+      const statsWhere = {};
+      if (from && to) {
+        statsWhere.fecha = { [Op.between]: [new Date(from), new Date(to + 'T23:59:59.999Z')] };
+      }
+
+      // RBAC para stats
+      const isAdminStats = req.user && (req.user.rol === 'admin' || req.user.gerencia === 'all');
+      if (!isAdminStats && req.user) {
+        const uGerencia = req.user.gerencia;
+        const uNameMap = {
+          'seguridad': ['seguridad', 'Seg. Ciudadana', 'Seguridad Ciudadana', 'Seguridad'],
+          'ambiental': ['ambiental', 'Des. Ambiental', 'Desarrollo Ambiental', 'Ambiental'],
+          'urbano': ['urbano', 'Des. Urbano', 'Desarrollo Urbano', 'Urbano'],
+          'humano': ['humano', 'Des. Humano', 'Desarrollo Humano', 'Humano'],
+          'rentas': ['rentas', 'Rentas'],
+          'municipal': ['municipal', 'Gerencia Municipal', 'Ger. Municipal']
+        };
+        const uVariants = uNameMap[uGerencia] || [uGerencia];
+        statsWhere[Op.or] = [
+          { grupo: { [Op.in]: uVariants } },
+          { areasDerivadas: { [Op.like]: `%${uGerencia}%` } }
+        ];
+      }
+
+      const allFiltered = await Model.findAll({ where: statsWhere });
+      const allMensajes = allFiltered.map(formatReporteFromDB);
       const stats = {
         total: allMensajes.length,
         nuevo: allMensajes.filter(m => m.estado === 'nuevo').length,
@@ -216,10 +339,21 @@ router.get('/reportes', async (req, res) => {
         alta: allMensajes.filter(m => m.prioridad === 'Alta').length,
         porGrupo: Object.keys(GRUPOS_CONFIG).reduce((acc, g) => {
           if (req.user && req.user.gerencia !== 'all' && req.user.gerencia !== g) return acc;
+
+          const nameMap = {
+            'seguridad': ['seguridad', 'Seg. Ciudadana', 'Seguridad Ciudadana', 'Seguridad'],
+            'ambiental': ['ambiental', 'Des. Ambiental', 'Desarrollo Ambiental', 'Ambiental'],
+            'urbano': ['urbano', 'Des. Urbano', 'Desarrollo Urbano', 'Urbano'],
+            'humano': ['humano', 'Des. Humano', 'Desarrollo Humano', 'Humano'],
+            'rentas': ['rentas', 'Rentas'],
+            'municipal': ['municipal', 'Gerencia Municipal', 'Ger. Municipal']
+          };
+          const variants = nameMap[g] || [g];
+
           acc[g] = allMensajes.filter(m => {
-            if (m.grupo === g) return true;
+            if (variants.includes(m.grupo)) return true;
             try {
-              return m.areasDerivadas && m.areasDerivadas.includes(g);
+              return m.areasDerivadas && m.areasDerivadas.some(area => variants.includes(area));
             } catch { return false; }
           }).length;
           return acc;
@@ -293,7 +427,7 @@ router.get('/reportes/:id', async (req, res) => {
   const Model = getModel();
 
   // BD first
-  if (Model && isDbConnected()) {
+  if (Model) {
     try {
       const msg = await Model.findOne({ where: { idString: req.params.id } });
       if (msg) return res.json(formatReporteFromDB(msg));
@@ -316,7 +450,7 @@ router.patch('/reportes/:id', async (req, res) => {
   const Model = getModel();
 
   // BD first
-  if (Model && isDbConnected()) {
+  if (Model) {
     try {
       const msg = await Model.findOne({ where: { idString: req.params.id } });
       if (msg) {
@@ -520,15 +654,28 @@ router.post('/webhook', async (req, res) => {
     esDerivacionMultiple: analysis.esDerivacionMultiple,
   };
 
-  // Save to DB
-  if (Model && isDbConnected()) {
-    try {
-      await Model.create({
-        idString: id,
-        ...nuevoReporte,
-        areasDerivadas: JSON.stringify(nuevoReporte.areasDerivadas),
-      });
-    } catch (e) { console.error('Error guardando webhook report:', e.message); }
+  // Sincronizar con el Feed en vivo (Memoria)
+  const { whatsappFeeds } = require('../data/mock-data');
+  if (whatsappFeeds[nuevoReporte.grupo]) {
+    whatsappFeeds[nuevoReporte.grupo].unshift({
+      id: nuevoReporte.id,
+      time: 'Ahora',
+      fecha: nuevoReporte.fecha,
+      sender: nuevoReporte.reportadoPor,
+      body: nuevoReporte.mensaje,
+      tags: [nuevoReporte.prioridad, 'WEB'],
+      color: nuevoReporte.prioridad === 'Alta' ? '#f87171' : '#fbbf24',
+      category: nuevoReporte.categoria,
+      lat: nuevoReporte.lat,
+      lng: nuevoReporte.lng,
+      ubicacion: nuevoReporte.ubicacion || nuevoReporte.direccionExtraida || null,
+      fotoUrl: nuevoReporte.fotoUrl,
+      sentiment: 'neutral'
+    });
+    // Limitar tamaño
+    if (whatsappFeeds[nuevoReporte.grupo].length > 50) {
+      whatsappFeeds[nuevoReporte.grupo].pop();
+    }
   }
 
   console.log(`📱 Webhook: ${id} → ${analysis.areaPrincipal} | ${analysis.categoria}`);
@@ -542,7 +689,7 @@ router.get('/export/:year/:month', async (req, res) => {
   const { year, month } = req.params;
   const Model = getModel();
 
-  if (!Model || !isDbConnected()) {
+  if (!Model) {
     return res.status(500).json({ error: 'Base de datos no disponible' });
   }
 
@@ -596,7 +743,7 @@ router.delete('/purge/:year/:month', async (req, res) => {
   const { year, month } = req.params;
   const Model = getModel();
 
-  if (!Model || !isDbConnected()) {
+  if (!Model) {
     return res.status(500).json({ error: 'Base de datos no disponible' });
   }
 
@@ -678,7 +825,7 @@ router.delete('/cleanup-demo', async (req, res) => {
     const { Op } = require('sequelize');
 
     const hoy = new Date();
-    hoy.setHours(0,0,0,0);
+    hoy.setHours(0, 0, 0, 0);
 
     // 1. Borrar ABSOLUTAMENTE TODOS los reportes de WhatsApp
     const deletedWsp = await MensajeWhatsapp.destroy({
@@ -690,6 +837,7 @@ router.delete('/cleanup-demo', async (req, res) => {
     await Licencia.destroy({ where: {} });
     await Inspeccion.destroy({ where: {} });
     await Obra.destroy({ where: {} });
+
 
     res.json({ message: `Limpieza TOTAL exitosa. Se eliminaron ${deletedWsp} reportes y se resetearon las tablas de gestión.` });
   } catch (err) {

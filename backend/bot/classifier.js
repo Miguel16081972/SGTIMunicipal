@@ -15,6 +15,7 @@ async function syncGruposVinculados() {
     const nuevoCache = {};
     vinculados.forEach(v => {
       nuevoCache[v.remoteId] = { areaId: v.areaId, monitoreado: v.monitoreado };
+      if (v.monitoreado) console.log(`🔗 Grupo Vinculado: ${v.remoteId} -> ${v.areaId}`);
     });
     CACHE_GRUPOS_VINCULADOS = nuevoCache;
     console.log(`🔄 Cache de grupos sincronizado: ${Object.keys(nuevoCache).length} registros.`);
@@ -179,9 +180,16 @@ function detectGroupFromChatName(chatName) {
 function isMonitoredGroup(chatName, remoteId = null) {
   // Si tenemos el ID técnico, mandamos nosotros según la DB
   if (remoteId && CACHE_GRUPOS_VINCULADOS[remoteId]) {
-    return CACHE_GRUPOS_VINCULADOS[remoteId].monitoreado === true;
+    const isMon = CACHE_GRUPOS_VINCULADOS[remoteId].monitored === true || CACHE_GRUPOS_VINCULADOS[remoteId].monitoreado === true;
+    if (!isMon) console.log(`🚫 Grupo vinculado pero NO monitoreado: ${chatName} (${remoteId})`);
+    return isMon;
   }
-  // Si no hay ID o no está en DB, ignoramos por defecto
+  
+  // Log para depuración de IDs no encontrados
+  if (remoteId) {
+    console.log(`❓ Grupo no encontrado en cache: ${chatName} (${remoteId})`);
+  }
+  
   return false;
 }
 
@@ -198,7 +206,13 @@ function classifyMessage(text, chatName = '', remoteId = null) {
   if (remoteId && CACHE_GRUPOS_VINCULADOS[remoteId]) {
     const link = CACHE_GRUPOS_VINCULADOS[remoteId];
     if (link.monitoreado) {
-      areaPorVinculo = link.areaId;
+      // Normalizar: Convertir "Seg. Ciudadana" a "seguridad" si es necesario
+      const rawAreaId = link.areaId;
+      if (rawAreaId === 'Seg. Ciudadana' || rawAreaId === 'Seguridad') areaPorVinculo = 'seguridad';
+      else if (rawAreaId === 'Ambiental' || rawAreaId === 'Des. Ambiental') areaPorVinculo = 'ambiental';
+      else if (rawAreaId === 'Urbano') areaPorVinculo = 'urbano';
+      else if (rawAreaId === 'Humano') areaPorVinculo = 'humano';
+      else areaPorVinculo = rawAreaId;
     }
   } 
 

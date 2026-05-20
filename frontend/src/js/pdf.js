@@ -235,7 +235,7 @@ export async function generateReportesPdf(grupo) {
     doc.setFont(undefined, 'bold');
     doc.text(dateRangeText, 14, 43);
     doc.setFont(undefined, 'normal');
-    doc.text(`Muestra: ${stats.total || reportes.length} incidencias analizadas`, 110, 43);
+    doc.text(`Muestra: ${reportes.length} incidencias analizadas`, 110, 43);
 
     doc.setTextColor(40, 40, 40);
     let y = 60;
