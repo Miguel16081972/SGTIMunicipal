@@ -11,6 +11,7 @@ let CACHE_GRUPOS_VINCULADOS = {};
  */
 async function syncGruposVinculados() {
   try {
+    const { GrupoVinculado } = require('../database/models');
     const vinculados = await GrupoVinculado.findAll(); // Traer todos para saber cuáles ignorar explícitamente
     const nuevoCache = {};
     vinculados.forEach(v => {
@@ -153,12 +154,28 @@ const PRIORIDAD_OVERRIDE = {
 
 // ===== PATRONES DE DIRECCIÓN =====
 const ADDRESS_PATTERNS = [
-  /((?:Av(?:enida)?|Jr|Jirón|Jiron|Calle|Cl|Psje|Pasaje|Pj|Alameda|Boulevard|Blvd)\.?\s+[A-Za-záéíóúÁÉÍÓÚñÑ\s]+(?:\s+(?:cdra?\.?\s*)?\d+[A-Za-z]?)?)/i,
+  // Patrón especial: *LUGAR* (formato operativo común en los grupos)
+  /\*LUGAR\*\s*[:.]?\s*([^*\n]+)/i,
+  // Patrón especial: LUGAR:, UBICACION:, DIRECCIÓN:
+  /(?:LUGAR|UBICACI[OÓ]N|DIRECCI[OÓ]N)\s*[:.]\s*([^\n*]+)/i,
+  // Calles con prefijo formal (Añadido Aux/Auxiliar)
+  /((?:Av(?:enida)?|Jr|Jirón|Jiron|Calle|Cl|Psje|Pasaje|Pj|Alameda|Boulevard|Blvd|Aux\.?|Auxiliar)\.?\s+[A-Za-záéíóúÁÉÍÓÚñÑ\s]+(?:\s+(?:cdra?\.?\s*)?\d+[A-Za-z]?)?)/i,
+  // Cuadra N de Calle
   /((?:cuadra|cdra?\.?)\s+\d+(?:\s+de)?\s+(?:Av(?:enida)?|Jr|Jirón|Jiron|Calle|Cl|Psje|Pasaje)\.?\s+[A-Za-záéíóúÁÉÍÓÚñÑ\s]+)/i,
+  // Cruces e intersecciones
   /((?:cruce|esquina|esq\.?)\s+(?:de\s+)?[A-Za-záéíóúÁÉÍÓÚñÑ\s]+\s+(?:con|y)\s+[A-Za-záéíóúÁÉÍÓÚñÑ\s]+)/i,
+  // Manzana / Lote
   /(Mz\.?\s*[A-Za-z0-9]+\s*(?:Lt|Lote)\.?\s*\d+(?:\s*[-,]\s*[A-Za-záéíóúÁÉÍÓÚñÑ\s]+)?)/i,
+  // AAHH, Urbanización, Asociación
   /((?:AA\.?\s*HH\.?|Asentamiento\s+Humano|Urb(?:anización)?\.?|Asoc(?:iación)?\.?)\s+[A-Za-záéíóúÁÉÍÓÚñÑ\s]+)/i,
+  // Sector
   /(Sector\s+\d+(?:\s*[-,]\s*[A-Za-záéíóúÁÉÍÓÚñÑ\s]+)?)/i,
+  // Patrón flexible: "calle/nombre + número" (ej: "julio c tello 873", "bulevar marco capac 38")
+  /(?:predio|en el|en la|por|frente a)\s+([A-Za-záéíóúÁÉÍÓÚñÑ\s]{4,}\s+\d{1,5})/i,
+  // Patrón Natural (NUEVO): Captura nombres propios después de conectores (ej: "en Auxiliar Faucett", "frente a Plaza San Miguel")
+  /(?:en|en el|en la|en el punto de|por|frente a|altura|esquina|cerca de|ubicado en)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)/,
+  // Capturar lo que sigue a "en " si son al menos 2 palabras capitalizadas
+  /\ben\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)/,
 ];
 
 // ===== DETECCIÓN DE SECTOR =====
@@ -174,20 +191,19 @@ const SECTOR_PATTERNS = [
 
 function detectGroupFromChatName(chatName) {
   // DESACTIVADO por solicitud del usuario: ya no se guía de palabras clave en el nombre
-  return null; 
+  return null;
 }
 
 function isMonitoredGroup(chatName, remoteId = null) {
-  // Si tenemos el ID técnico, mandamos nosotros según la DB
+  // 1. MODO ESTRICTO: Solo lo que esté en la cache de vinculados (DB)
   if (remoteId && CACHE_GRUPOS_VINCULADOS[remoteId]) {
     const isMon = CACHE_GRUPOS_VINCULADOS[remoteId].monitored === true || CACHE_GRUPOS_VINCULADOS[remoteId].monitoreado === true;
-    if (!isMon) console.log(`🚫 Grupo vinculado pero NO monitoreado: ${chatName} (${remoteId})`);
     return isMon;
   }
   
-  // Log para depuración de IDs no encontrados
+  // Log para que sepas por qué no llega (puedes verlo en pm2 logs)
   if (remoteId) {
-    console.log(`❓ Grupo no encontrado en cache: ${chatName} (${remoteId})`);
+    console.log(`ℹ️ Mensaje ignorado: Grupo [${chatName}] no está vinculado o monitoreo está OFF.`);
   }
   
   return false;
@@ -195,10 +211,10 @@ function isMonitoredGroup(chatName, remoteId = null) {
 
 function classifyMessage(text, chatName = '', remoteId = null) {
   const lowerText = text.toLowerCase();
-  
+
   // Áreas detectadas por el contenido (keywords)
   const areasPorContenido = new Set();
-  
+
   // Áreas detectadas por vinculación DIRECTA (DB) u ORIGEN (Keywords en nombre)
   let areaPorVinculo = null;
 
@@ -214,7 +230,7 @@ function classifyMessage(text, chatName = '', remoteId = null) {
       else if (rawAreaId === 'Humano') areaPorVinculo = 'humano';
       else areaPorVinculo = rawAreaId;
     }
-  } 
+  }
 
   let categoriaDetectada = 'Sin clasificar';
   let prioridadBase = 'Media';
@@ -233,7 +249,7 @@ function classifyMessage(text, chatName = '', remoteId = null) {
   // 2. LÓGICA DE DERIVACIÓN FINAL (100% ESTRICTA):
   // REGLA DE ORO: El grupo manda sobre el contenido.
   let areasFinales = new Set();
-  
+
   if (areaPorVinculo) {
     // El área viene EXCLUSIVAMENTE de la base de datos
     areasFinales.add(areaPorVinculo);
@@ -246,7 +262,7 @@ function classifyMessage(text, chatName = '', remoteId = null) {
   if (categoriasMultiples.length > 0) {
     const prioridadOrder = { 'Alta': 3, 'Media': 2, 'Baja': 1 };
     categoriasMultiples.sort((a, b) => (prioridadOrder[b.prioridad] || 0) - (prioridadOrder[a.prioridad] || 0));
-    
+
     categoriaDetectada = categoriasMultiples[0].categoria;
     prioridadBase = categoriasMultiples[0].prioridad;
   }

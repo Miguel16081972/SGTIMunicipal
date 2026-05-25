@@ -186,7 +186,7 @@ router.get('/feed/:grupo', async (req, res) => {
       const mensajes = await Model.findAll({
         where,
         order: [['fecha', 'DESC']],
-        limit: (from || to) ? 500 : 100, // 100 por defecto para velocidad, 500 con filtros
+        limit: 50, // Límite estricto para no saturar la UI con fotos Base64
       });
 
       if (mensajes && mensajes.length > 0) {
@@ -207,7 +207,8 @@ router.get('/feed/:grupo', async (req, res) => {
             category: m.categoria,
             areasDerivadas: m.areasDerivadas ? JSON.parse(m.areasDerivadas) : [grupo],
             esDerivacionMultiple: m.esDerivacionMultiple || false,
-            fotoUrl: m.fotoUrl
+            fotoUrl: m.fotoUrl,
+            estado: m.estado || 'nuevo'
           };
         });
         return res.json({ grupo, feed, source: 'database' });
@@ -295,12 +296,22 @@ router.get('/reportes', async (req, res) => {
 
       console.log(`📝 [REPORTE QUERY] Where:`, JSON.stringify(where));
 
-      const queryLimit = (from && to) ? 1000 : 100;
-      const mensajes = await Model.findAll({
+      const queryOptions = {
         where,
         order: [['fecha', orden === 'antiguo' ? 'ASC' : 'DESC']],
-        limit: queryLimit
-      });
+        attributes: { exclude: ['fotoUrl'] } // Evitar cargar imágenes Base64 pesadas
+      };
+      
+      // Lógica de paginación o extracción completa
+      if (req.query.limit === 'all') {
+        // No aplicar límite, traer todo
+      } else if (req.query.limit) {
+        queryOptions.limit = parseInt(req.query.limit, 10);
+      } else {
+        queryOptions.limit = (from && to) ? 5000 : 500; // Aumentamos límite por defecto
+      }
+
+      const mensajes = await Model.findAll(queryOptions);
 
       const reportes = mensajes.map(formatReporteFromDB);
 
@@ -329,7 +340,10 @@ router.get('/reportes', async (req, res) => {
         ];
       }
 
-      const allFiltered = await Model.findAll({ where: statsWhere });
+      const allFiltered = await Model.findAll({ 
+        where: statsWhere,
+        attributes: { exclude: ['fotoUrl'] }
+      });
       const allMensajes = allFiltered.map(formatReporteFromDB);
       const stats = {
         total: allMensajes.length,
@@ -441,12 +455,11 @@ router.get('/reportes/:id', async (req, res) => {
   const all = [...getMemoryReportes()];
   const reporte = all.find(r => r.id === req.params.id);
   if (!reporte) return res.status(404).json({ error: 'Reporte no encontrado' });
-  res.json(reporte);
 });
 
 // PATCH /api/whatsapp/reportes/:id — Actualizar estado
 router.patch('/reportes/:id', async (req, res) => {
-  const { estado, asignadoA, notas, lat, lng, ubicacion, grupo } = req.body;
+  const { estado, asignadoA, notas, lat, lng, ubicacion, grupo, mensaje } = req.body;
   const Model = getModel();
 
   // BD first
@@ -468,6 +481,7 @@ router.patch('/reportes/:id', async (req, res) => {
         if (lng !== undefined) msg.lng = lng;
         if (ubicacion !== undefined) msg.ubicacion = ubicacion;
         if (grupo !== undefined) msg.grupo = grupo;
+        if (mensaje !== undefined) msg.mensaje = mensaje;
         await msg.save();
         return res.json({ message: 'Reporte actualizado', reporte: formatReporteFromDB(msg) });
 
@@ -497,6 +511,7 @@ router.patch('/reportes/:id', async (req, res) => {
   if (lng !== undefined) reporte.lng = lng;
   if (ubicacion !== undefined) reporte.ubicacion = ubicacion;
   if (grupo !== undefined) reporte.grupo = grupo;
+  if (mensaje !== undefined) reporte.mensaje = mensaje;
 
   res.json({ message: 'Reporte actualizado', reporte });
 

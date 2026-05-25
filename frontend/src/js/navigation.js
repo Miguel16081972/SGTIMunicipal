@@ -1,19 +1,19 @@
 // ===== SGTI Municipal — Navigation =====
 import { logActivity } from './activity.js';
 import { createChartsFor, buildHeatmap, buildCoverageBars } from './charts.js';
-import { initMap, initMapWsp, initMapBenef } from './maps.js';
+import { initMap, initMapWsp, initMapBenef, initMapHeat } from './maps.js';
 import { renderWspFeed, currentWspGroup } from './whatsapp.js';
 
-const viewTitles = { overview: 'Vista General del Alcalde', whatsapp: 'Central WhatsApp', seguridad: 'Seguridad Ciudadana', ambiental: 'Desarrollo Ambiental', rentas: 'Rentas', urbano: 'Desarrollo Urbano', riesgo: 'Gestión del Riesgo', humano: 'Desarrollo Humano', participacion: 'Participación Vecinal', mapa: 'Mapa Territorial', actividad: 'Log de Actividad', equipo: 'Gestión de Equipo' };
-const viewBreadcrumbs = { overview: 'Sistema de Gestión Territorial', whatsapp: 'Información de Campo', seguridad: 'Gerencia de Seguridad', ambiental: 'Gerencia Ambiental', rentas: 'Gerencia de Rentas', urbano: 'Gerencia Urbano', riesgo: 'Gerencia Municipal', humano: 'Gerencia de Desarrollo Humano', participacion: 'Subgerencia de Participación Vecinal', mapa: 'Herramientas', actividad: 'Herramientas', equipo: 'Herramientas' };
+const viewTitles = { overview: 'Vista General del Alcalde', whatsapp: 'Central WhatsApp', seguridad: 'Seguridad Ciudadana', ambiental: 'Desarrollo Ambiental', rentas: 'Rentas', urbano: 'Desarrollo Urbano', riesgo: 'Gestión del Riesgo', humano: 'Desarrollo Humano', participacion: 'Participación Vecinal', mapa: 'Mapa Territorial', mapadecalor: 'Mapa de Calor', actividad: 'Log de Actividad', equipo: 'Gestión de Equipo' };
+const viewBreadcrumbs = { overview: 'Sistema de Gestión Territorial', whatsapp: 'Información de Campo', seguridad: 'Gerencia de Seguridad', ambiental: 'Gerencia Ambiental', rentas: 'Gerencia de Rentas', urbano: 'Gerencia Urbano', riesgo: 'Gerencia Municipal', humano: 'Gerencia de Desarrollo Humano', participacion: 'Subgerencia de Participación Vecinal', mapa: 'Herramientas', mapadecalor: 'Herramientas', actividad: 'Herramientas', equipo: 'Herramientas' };
 
 export function showView(view, tab) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   const targetView = document.getElementById('view-' + view);
   if (targetView) targetView.classList.add('active');
   
-  document.getElementById('view-title').textContent = viewTitles[view];
-  document.getElementById('breadcrumb').textContent = viewBreadcrumbs[view];
+  document.getElementById('view-title').textContent = viewTitles[view] || 'Sistema de Gestión';
+  document.getElementById('breadcrumb').textContent = viewBreadcrumbs[view] || 'Herramientas';
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.querySelectorAll(`.nav-item[data-view="${view}"]`).forEach(n => n.classList.add('active'));
 
@@ -21,6 +21,13 @@ export function showView(view, tab) {
     setTimeout(() => {
       const map = initMap();
       if (map) setTimeout(() => map.invalidateSize(), 200);
+    }, 100);
+  }
+  
+  if (view === 'mapadecalor') {
+    setTimeout(() => {
+      const mapH = initMapHeat();
+      if (mapH) setTimeout(() => mapH.invalidateSize(), 200);
     }, 100);
   }
   

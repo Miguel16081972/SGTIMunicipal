@@ -79,6 +79,7 @@ const MensajeWhatsapp = sequelize.define('MensajeWhatsapp', {
   fotoUrl: { type: DataTypes.TEXT('long') },
   areasDerivadas: { type: DataTypes.TEXT },             // JSON array de áreas derivadas
   esDerivacionMultiple: { type: DataTypes.BOOLEAN, defaultValue: false },
+  supervisor: { type: DataTypes.STRING(100) },
 }, { timestamps: true });
 
 const GrupoVinculado = sequelize.define('GrupoVinculado', {
@@ -89,7 +90,15 @@ const GrupoVinculado = sequelize.define('GrupoVinculado', {
   monitoreado: { type: DataTypes.BOOLEAN, defaultValue: true },
 }, { timestamps: true });
 
+// Modelo de Configuración global (supervisores por turno, etc.)
+const Configuracion = sequelize.define('Configuracion', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  clave: { type: DataTypes.STRING(100), allowNull: false, unique: true },
+  valor: { type: DataTypes.STRING(255) },
+  gerencia: { type: DataTypes.STRING(50) },
+}, { timestamps: true });
+
 // Relaciones (si necesitamos consultas JOIN)
 Incidencia.belongsTo(Usuario, { as: 'reportador' });
 
-module.exports = { Usuario, Incidencia, Licencia, Inspeccion, Obra, MensajeWhatsapp, GrupoVinculado };
+module.exports = { Usuario, Incidencia, Licencia, Inspeccion, Obra, MensajeWhatsapp, GrupoVinculado, Configuracion };

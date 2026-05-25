@@ -1,6 +1,6 @@
 // ===== SGTI Municipal — API Layer =====
-const API_BASE = (window.Capacitor && window.Capacitor.isNativePlatform()) 
-  ? 'https://sgti-municipal.com/api' // Reemplazar con tu dominio real de Hostinger
+const API_BASE = (window.Capacitor && window.Capacitor.isNativePlatform())
+  ? 'https://app.gobernanzamunicipal.com/api'
   : '/api';
 
 class API {
@@ -100,7 +100,10 @@ class API {
   async getHumanoEducacion() { return this.request('/humano/educacion'); }
   async getWhatsapp() { return this.request('/whatsapp'); }
   async getWhatsappStatus() { return this.request('/whatsapp/status'); }
-  async getWhatsappFeed(grupo) { return this.request(`/whatsapp/feed/${grupo}`); }
+  async getWhatsappFeed(grupo, filters = {}) {
+    const params = new URLSearchParams(filters).toString();
+    return this.request(`/whatsapp/feed/${grupo}${params ? '?' + params : ''}`);
+  }
   async getWhatsappReportes(filters = {}) {
     const params = new URLSearchParams(filters).toString();
     return this.request(`/whatsapp/reportes${params ? '?' + params : ''}`);
@@ -126,11 +129,18 @@ class API {
 
   // Equipo
   async getEquipo() { return this.request('/equipo/personal'); }
+  async getUsuarioReportes(id) { return this.request(`/equipo/personal/${id}/reportes`); }
   async crearUsuarioEquipo(data) {
     return this.request('/equipo/personal', { method: 'POST', body: JSON.stringify(data) });
   }
   async eliminarUsuarioEquipo(id) {
     return this.request(`/equipo/personal/${id}`, { method: 'DELETE' });
+  }
+  async getSupervisoresTurno() {
+    return this.request('/equipo/supervisores-turno');
+  }
+  async setSupervisoresTurno(data) {
+    return this.request('/equipo/supervisores-turno', { method: 'POST', body: JSON.stringify(data) });
   }
 }
 

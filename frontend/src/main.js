@@ -15,7 +15,7 @@ import { toggleNotifs, clearNotifs, setupNotifClickAway, toggleCompare } from '.
 import { generateReportesPdf } from './js/pdf.js';
 import { switchWspGroup, renderWspFeed, switchWspTab, filtrarReportes, refreshReportes, startAutoRefresh, cambiarEstadoReporte, verReporte, cerrarReporteModal } from './js/whatsapp.js';
 import { logActivity, renderActivityLog, seedActivityLog } from './js/activity.js';
-import { renderEquipoList, crearUsuarioEquipo } from './js/equipo.js';
+import { renderEquipoList, crearUsuarioEquipo, cargarSupervisoresTurno, guardarSupervisorTurnoUnico } from './js/equipo.js';
 
 // Check auth
 if (!api.isAuthenticated()) {
@@ -52,13 +52,23 @@ function initApp() {
   window.verReporte = verReporte;
   window.cerrarReporteModal = cerrarReporteModal;
   window.showWspGerencia = (g) => {
+    const user = api.getUser();
+    const subAreasSeguridad = ['serenazgo', 'fiscalizacion', 'transporte'];
+    
+    // Si el botón intenta cargar 'seguridad' pero el usuario es de una sub-área, forzamos su sub-área.
+    let targetGroup = g;
+    if (g === 'seguridad' && user && subAreasSeguridad.includes(user.gerencia)) {
+      targetGroup = user.gerencia;
+    }
+    
     showView('whatsapp');
     switchWspTab('feed');
-    switchWspGroup(g);
+    switchWspGroup(targetGroup);
   };
   window.logout = () => api.logout();
   window.crearUsuarioEquipo = crearUsuarioEquipo;
   window.renderEquipoList = renderEquipoList;
+  window.guardarSupervisorTurnoUnico = guardarSupervisorTurnoUnico;
 
   // Clock
   updateClock();
@@ -102,18 +112,29 @@ function initApp() {
       // 1. Ocultar nav-items no permitidos
       document.querySelectorAll('.nav-item').forEach(el => {
         const view = el.dataset.view;
+        
+        // Bloquear Gestión de Equipo para supervisores (visor)
+        if (view === 'equipo' && user.rol === 'visor') {
+          el.style.display = 'none';
+          return;
+        }
+
         if (['mapa', 'actividad', 'equipo'].includes(view)) return;
         
         if (view === 'whatsapp') {
           const onclickAttr = el.getAttribute('onclick') || '';
-          if (!onclickAttr.includes(`'${user.gerencia}'`) && !onclickAttr.includes(`"${user.gerencia}"`)) {
+          const subAreasSeguridad = ['serenazgo', 'fiscalizacion', 'transporte'];
+          const mappedGerencia = subAreasSeguridad.includes(user.gerencia) ? 'seguridad' : user.gerencia;
+          if (!onclickAttr.includes(`'${mappedGerencia}'`) && !onclickAttr.includes(`"${mappedGerencia}"`)) {
             el.style.display = 'none';
           }
         } else if (view === 'overview') {
           el.style.display = 'none';
         } else {
           // La gerencia municipal ve "riesgo"
-          const esSuGerencia = view === user.gerencia || (user.gerencia === 'municipal' && view === 'riesgo');
+          const subAreasSeguridad = ['serenazgo', 'fiscalizacion', 'transporte'];
+          const mappedGerencia = subAreasSeguridad.includes(user.gerencia) ? 'seguridad' : user.gerencia;
+          const esSuGerencia = view === mappedGerencia || (user.gerencia === 'municipal' && view === 'riesgo');
           if (!esSuGerencia) el.style.display = 'none';
         }
       });
@@ -137,11 +158,23 @@ function initApp() {
         }
       });
 
+      // Modificar el texto del menú lateral "Seguridad Ciudadana" a su sub-área específica
+      if (['fiscalizacion', 'transporte'].includes(user.gerencia)) {
+        document.querySelectorAll('.nav-item').forEach(el => {
+          if (el.textContent.includes('Seguridad Ciudadana')) {
+            el.innerHTML = user.gerencia === 'fiscalizacion' ? 'Fiscalización' : 'Transporte y Vialidad';
+          }
+        });
+      }
+
       // 4. Establecer la vista predeterminada de su gerencia
-      const vistaInicial = user.gerencia === 'municipal' ? 'riesgo' : user.gerencia;
+      const subAreasSeguridad = ['serenazgo', 'fiscalizacion', 'transporte'];
+      const mappedGerencia = subAreasSeguridad.includes(user.gerencia) ? 'seguridad' : user.gerencia;
+      
+      const vistaInicial = user.gerencia === 'municipal' ? 'riesgo' : mappedGerencia;
       setTimeout(() => showView(vistaInicial), 50);
       
-      // Asegurar que el feed de WS recargue lo correcto
+      // Asegurar que el feed de WS recargue lo correcto (aquí SÍ pasamos la gerencia real para que filtre)
       setTimeout(() => { if(window.switchWspGroup) window.switchWspGroup(user.gerencia); }, 100);
 
       // 5. Ocultar opciones de filtros e informes PDFs ajenos
@@ -173,12 +206,24 @@ function initApp() {
         });
 
         // 6. Ocultar tarjetas de otras gerencias en el Feed
+        const subAreasSeguridadCheck = ['serenazgo', 'fiscalizacion', 'transporte'];
+        const isSubAreaSeg = subAreasSeguridadCheck.includes(user.gerencia);
+        const targetBtnId = isSubAreaSeg ? 'wsp-btn-seguridad' : `wsp-btn-${user.gerencia}`;
+        
         document.querySelectorAll('.wsp-card').forEach(card => {
           const id = card.id;
-          if (id !== `wsp-btn-${user.gerencia}`) {
+          if (id !== targetBtnId) {
             card.style.display = 'none';
           }
         });
+
+        if (isSubAreaSeg) {
+          const segCard = document.getElementById('wsp-btn-seguridad');
+          if (segCard) {
+            segCard.querySelector('.wsp-card-name').textContent = user.gerencia.charAt(0).toUpperCase() + user.gerencia.slice(1);
+            segCard.setAttribute('onclick', `switchWspGroup('${user.gerencia}')`);
+          }
+        }
         
         // 7. Ocultar pestañas de Conexión y Mantenimiento (Solo Admin)
         document.querySelectorAll('#tabs-whatsapp .tab').forEach(tab => {

@@ -160,7 +160,6 @@ async function submitReport() {
     const mensaje = document.getElementById('mensaje').value;
     const categoria = document.getElementById('categoria').value;
     const prioridad = document.getElementById('prioridad').value;
-    const estado = document.getElementById('estado').value;
     const reportadoPor = document.getElementById('reportadoPor').value;
 
     if (!mensaje) {
@@ -176,11 +175,12 @@ async function submitReport() {
         mensaje,
         categoria,
         prioridad,
-        estado,
         reportadoPor,
+        estado: 'nuevo', // Valor por defecto
         lat: userCoords.lat,
         lng: userCoords.lng,
-        ubicacion: `Reporte Móvil GPS (${userCoords.lat.toFixed(6)}, ${userCoords.lng.toFixed(6)})`
+        ubicacion: `Reporte Móvil GPS (${userCoords.lat.toFixed(6)}, ${userCoords.lng.toFixed(6)})`,
+        fotoUrl: null // Por ahora no hay captura de foto en esta UI
     };
 
 

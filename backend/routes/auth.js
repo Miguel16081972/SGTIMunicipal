@@ -43,7 +43,7 @@ router.post('/login', async (req, res) => {
           username: user.username,
           nombre: user.nombre,
           rol: user.rol,
-          gerencia: user.gerencia,
+          gerencia: user.gerencia
         },
       });
     } catch (dbError) {

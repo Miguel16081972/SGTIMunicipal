@@ -7,12 +7,12 @@ const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
 // Coordenadas centrales del distrito Carmen de La Legua Reynoso
 const DISTRITO_CENTER = { lat: -12.0435, lng: -77.0955 };
 
-// Bounding box del distrito (Ajustado a los 17 sectores oficiales)
+// Bounding box del distrito (Ajustado a los 17 sectores oficiales - ampliado ligeramente)
 const DISTRITO_BBOX = {
-  south: -12.0465, // Límite Av. Argentina / Chalaca
-  north: -12.0360, // Límite Río Rímac
-  west: -77.1000,  // Límite Gambetta
-  east: -77.0810   // Límite Lima
+  south: -12.0490, // Límite Av. Argentina / Chalaca (ampliado)
+  north: -12.0350, // Límite Río Rímac (ampliado)
+  west: -77.1020,  // Límite Gambetta (ampliado)
+  east: -77.0790   // Límite Lima (ampliado)
 };
 
 // Cache en memoria para evitar peticiones repetidas
@@ -42,8 +42,12 @@ function normalizeAddress(address) {
   if (!address) return '';
   
   let clean = address
+    // Remover nombres de personal o cargos que ensucian la dirección
+    .replace(/(insp|inspector|gerente|supervisor|sereno|unidad|móvil|movil|tgo|personal|encargado)\.?\s+[A-Za-zÀ-ÿ]+\s*[A-Za-zÀ-ÿ]*/gi, '')
     // Remover frases de introducción comunes
     .replace(/^(atención médica domiciliaria|reporte de|incidente en|emergencia en|ubicación:|dirección:)\s*/gi, '')
+    // Remover marcadores de formato WhatsApp
+    .replace(/\*/g, '')
     // Manejar intersecciones "con" -> "y" (Nominatim prefiere "and" o "y")
     .replace(/\bcon\b/gi, ' y ')
     // Abreviaturas de calles
@@ -52,6 +56,8 @@ function normalizeAddress(address) {
     .replace(/\bJr\.?\s*/gi, 'Jirón ')
     .replace(/\bCl\.?\s*/gi, 'Calle ')
     .replace(/\bPsje\.?\s*/gi, 'Pasaje ')
+    .replace(/\bAux\.?\s*/gi, 'Avenida Auxiliar ')
+    .replace(/\bAuxiliar\b/gi, 'Avenida Auxiliar ')
     .replace(/\besq\.?\s*/gi, 'esquina ')
     // Limpieza general
     .replace(/\s+/g, ' ')
@@ -80,7 +86,6 @@ async function geocodeAddress(address) {
     await rateLimitWait();
 
     // Priorizar búsqueda local — Forzamos Carmen de la Legua como parte de la cadena principal
-    // Nominatim a veces ignora el viewbox si no hay coincidencias exactas dentro
     const searchQuery = `${normalizedAddr}, Carmen de La Legua Reynoso, Callao, Perú`;
 
     const params = new URLSearchParams({
@@ -88,7 +93,6 @@ async function geocodeAddress(address) {
       format: 'json',
       limit: '5',
       addressdetails: '1',
-      // Forzar al área del Callao / Carmen de la Legua de forma más estricta
       viewbox: `${DISTRITO_BBOX.west},${DISTRITO_BBOX.north},${DISTRITO_BBOX.east},${DISTRITO_BBOX.south}`,
       bounded: '1', 
       'accept-language': 'es'
@@ -129,16 +133,80 @@ async function geocodeAddress(address) {
       }
     }
 
-    // Fallback: Si no se encuentra, ponerlo en una "Zona de Validación" central
-    // Evitamos dispersión aleatoria fuera del mapa
-    console.log(`⚠️ No se pudo geocodificar con precisión: "${normalizedAddr}". Usando Zona de Validación.`);
-    const fallback = generateFallbackCoords(normalizedAddr);
-    geocodeCache.set(cacheKey, fallback);
-    return fallback;
+    // SEGUNDO INTENTO: Búsqueda sin bounded estricto (para calles cercanas al límite)
+    await rateLimitWait();
+    const params2 = new URLSearchParams({
+      q: `${normalizedAddr}, Callao, Perú`,
+      format: 'json',
+      limit: '3',
+      addressdetails: '1',
+      viewbox: `${DISTRITO_BBOX.west - 0.01},${DISTRITO_BBOX.north + 0.005},${DISTRITO_BBOX.east + 0.01},${DISTRITO_BBOX.south - 0.005}`,
+      bounded: '0',
+      'accept-language': 'es'
+    });
+
+    const response2 = await fetch(`${NOMINATIM_URL}?${params2}`, {
+      headers: {
+        'User-Agent': 'SGTI-Municipal-CDLL/2.0 (sistema.territorial@carmendelalegua.gob.pe)',
+        'Accept': 'application/json'
+      }
+    });
+
+    if (response2.ok) {
+      const results2 = await response2.json();
+      if (results2.length > 0) {
+        // Aceptar resultado si está razonablemente cerca del distrito (radio ampliado)
+        const nearResult = results2.find(r => {
+          const lat = parseFloat(r.lat);
+          const lon = parseFloat(r.lon);
+          return lat >= (DISTRITO_BBOX.south - 0.008) && lat <= (DISTRITO_BBOX.north + 0.008) &&
+                 lon >= (DISTRITO_BBOX.west - 0.008) && lon <= (DISTRITO_BBOX.east + 0.008);
+        });
+
+        if (nearResult) {
+          const result = {
+            lat: parseFloat(nearResult.lat),
+            lng: parseFloat(nearResult.lon),
+            displayName: nearResult.display_name
+          };
+          geocodeCache.set(cacheKey, result);
+          console.log(`📍 Geocodificado (ampliado): "${normalizedAddr}" → ${result.lat}, ${result.lng}`);
+          return result;
+        }
+      }
+    }
+
+    // TERCER INTENTO: Solo las primeras 2-3 palabras (Limpiar ruido excesivo)
+    const simplifiedAddr = normalizedAddr.split(' ').slice(0, 3).join(' ');
+    if (simplifiedAddr.length > 5 && simplifiedAddr !== normalizedAddr) {
+      console.log(`🔍 Intentando búsqueda simplificada: "${simplifiedAddr}"`);
+      await rateLimitWait();
+      const params3 = new URLSearchParams({
+        q: `${simplifiedAddr}, Carmen de La Legua, Callao, Perú`,
+        format: 'json',
+        limit: '1',
+        'accept-language': 'es'
+      });
+      const response3 = await fetch(`${NOMINATIM_URL}?${params3}`, {
+        headers: { 'User-Agent': 'SGTI-Municipal-CDLL/2.0', 'Accept': 'application/json' }
+      });
+      if (response3.ok) {
+        const results3 = await response3.json();
+        if (results3.length > 0) {
+          const result = { lat: parseFloat(results3[0].lat), lng: parseFloat(results3[0].lon), displayName: results3[0].display_name };
+          geocodeCache.set(cacheKey, result);
+          return result;
+        }
+      }
+    }
+
+    // Si no se encuentra, retornar null
+    console.log(`⚠️ No se pudo geocodificar con precisión: "${normalizedAddr}".`);
+    return null;
 
   } catch (error) {
     console.error(`❌ Error en geocodificación de "${address}":`, error.message);
-    return generateFallbackCoords(address);
+    return null;
   }
 }
 

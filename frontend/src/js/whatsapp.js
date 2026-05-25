@@ -4,7 +4,7 @@ import { logActivity } from './activity.js';
 
 export let currentWspGroup = 'municipal';
 let wspFeeds = {
-  municipal: [], seguridad: [], ambiental: [], rentas: [], urbano: [], humano: [], participacion: [], opc: [], demuna: [], ciam: [], omaped: [], otros: []
+  municipal: [], seguridad: [], ambiental: [], rentas: [], urbano: [], humano: [], participacion: [], opc: [], demuna: [], ciam: [], omaped: [], otros: [], fiscalizacion: [], transporte: [], serenazgo: []
 };
 
 export function getWspFeeds() { return wspFeeds; }
@@ -21,45 +21,93 @@ export async function renderWspFeed(grupo) {
   const activeCard = document.getElementById(`wsp-btn-${grupo}`);
   if (activeCard) activeCard.style.borderColor = 'var(--blue)';
 
-  const grupoNames = { municipal: 'Gerencia Municipal', seguridad: 'Seguridad Ciudadana', ambiental: 'Desarrollo Ambiental', rentas: 'Rentas', urbano: 'Desarrollo Urbano', humano: 'Desarrollo Humano', participacion: 'Participación Vecinal', opc: 'OPC', demuna: 'DEMUNA', ciam: 'CIAM', omaped: 'OMAPED', otros: 'Otros' };
+  const grupoNames = { municipal: 'Gerencia Municipal', seguridad: 'Seguridad Ciudadana', ambiental: 'Desarrollo Ambiental', rentas: 'Rentas', urbano: 'Desarrollo Urbano', humano: 'Desarrollo Humano', participacion: 'Participación Vecinal', opc: 'OPC', demuna: 'DEMUNA', ciam: 'CIAM', omaped: 'OMAPED', otros: 'Otros', fiscalizacion: 'Fiscalización y Sanciones', transporte: 'Transporte y Vialidad', serenazgo: 'Serenazgo' };
   titleEl.textContent = `Feed — ${grupoNames[grupo] || grupo}`;
 
   const from = document.getElementById('filter-from')?.value;
   const to = document.getElementById('filter-to')?.value;
 
   try {
-    const { reportes } = await api.getWhatsappReportes({ grupo, limit: 50, from, to });
-    wspFeeds[grupo] = reportes || [];
+    const filters = {};
+    if (from) filters.from = from;
+    if (to) filters.to = to;
+
+    const { feed } = await api.getWhatsappFeed(grupo, filters);
+    wspFeeds[grupo] = feed || [];
     
     feedEl.innerHTML = '';
-    if (wspFeeds[grupo].length === 0) {
-      feedEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-dim)">No hay mensajes recientes en este grupo</div>';
-      return;
+    
+    // Mostrar u ocultar el filtro según el rol y gerencia
+    const filterSubareaEl = document.getElementById('feed-filtro-subarea');
+    const user = api.getUser();
+    if (filterSubareaEl) {
+      if (user && (user.rol === 'admin' || (user.rol === 'gerente' && user.gerencia === 'seguridad'))) {
+        filterSubareaEl.style.display = 'inline-block';
+      } else {
+        filterSubareaEl.style.display = 'none';
+        filterSubareaEl.value = 'todos'; // Forzar reseteo si no tiene permiso
+      }
     }
 
-    wspFeeds[grupo].forEach(m => {
+    // Filtro por subárea
+    const filterSubarea = filterSubareaEl?.value || 'todos';
+    let itemsToRender = wspFeeds[grupo];
+    
+    if (filterSubarea !== 'todos') {
+      itemsToRender = itemsToRender.filter(m => 
+        (m.category || '').toLowerCase().includes(filterSubarea) || 
+        (m.sender || '').toLowerCase().includes(filterSubarea) ||
+        (m.areasDerivadas && m.areasDerivadas.some(a => a.toLowerCase().includes(filterSubarea)))
+      );
+    }
+
+    if (itemsToRender.length === 0) {
+      feedEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-dim)">No hay mensajes recientes que coincidan con el filtro</div>';
+    } else {
+      itemsToRender.forEach(m => {
+        // ... (resto de HTML del card)
+      console.log(`📸 [FEED IMG DEBUG] ID: ${m.id}, FotoUrl starts with: ${m.fotoUrl ? m.fotoUrl.substring(0, 30) : 'NULL'}, Length: ${m.fotoUrl ? m.fotoUrl.length : 0}`);
       const card = document.createElement('div');
       card.className = 'feed-item';
       card.innerHTML = `
         <div class="fi-header">
           <div style="display:flex;align-items:center;gap:8px">
-            <div class="fi-avatar">${(m.reportadoPor || '?').charAt(0)}</div>
+            <div class="fi-avatar">${(m.sender || '?').charAt(0)}</div>
             <div>
-              <div class="fi-user">${m.reportadoPor} <span style="font-size:9px; color:var(--text-muted); font-weight:normal; text-transform:uppercase;"> — ${m.categoria || ''}</span></div>
-              <div class="fi-time">${new Date(m.fecha).toLocaleString()}</div>
+              <div class="fi-user">${m.sender} <span style="font-size:9px; color:var(--text-muted); font-weight:normal; text-transform:uppercase;"> — ${m.category || ''}</span></div>
+              <div class="fi-time">${m.time}</div>
             </div>
           </div>
-          <span class="badge ${m.estado==='atendido'?'badge-green':(m.estado==='en_proceso'?'badge-amber':'badge-red')}">${m.estado.toUpperCase()}</span>
+          <span class="badge ${m.sentiment==='positivo'?'badge-green':(m.sentiment==='negativo'?'badge-red':'badge-amber')}">${m.category}</span>
         </div>
-        <div class="fi-body">${m.mensaje}</div>
-        ${m.fotoUrl ? `<div class="fi-img-wrap" style="margin-top:10px; margin-bottom:12px;"><img src="${m.fotoUrl.startsWith('data:') ? m.fotoUrl : 'data:image/jpeg;base64,' + m.fotoUrl}" style="width:120px; height:120px; object-fit:cover; border-radius:12px; cursor:zoom-in; border:2px solid var(--blue); box-shadow: 0 4px 15px rgba(0,0,0,0.2)" onclick="window.open('${m.fotoUrl.startsWith('data:') ? m.fotoUrl : 'data:image/jpeg;base64,' + m.fotoUrl}', '_blank')"></div>` : ''}
-        ${m.ubicacion ? `<div class="fi-loc">📍 ${m.ubicacion}</div>` : ''}
+        <div class="fi-body">${m.body}</div>
+        ${m.fotoUrl && m.fotoUrl.length > 50 ? `
+          <div class="fi-img-wrap" style="margin-top:10px; margin-bottom:12px;">
+            <img src="${m.fotoUrl.startsWith('http') || m.fotoUrl.startsWith('data:') ? m.fotoUrl : 'data:image/jpeg;base64,' + m.fotoUrl}" 
+                 style="width:120px; height:120px; object-fit:cover; border-radius:12px; cursor:zoom-in; border:2px solid var(--blue); box-shadow: 0 4px 15px rgba(0,0,0,0.2)" 
+                 onclick="
+                   const overlay = document.createElement('div');
+                   overlay.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:999999; display:flex; justify-content:center; align-items:center; cursor:zoom-out;';
+                   const img = document.createElement('img');
+                   img.src = this.src;
+                   img.style.cssText = 'max-width:95%; max-height:95%; object-fit:contain; border-radius:8px; box-shadow:0 10px 50px rgba(0,0,0,0.8);';
+                   overlay.appendChild(img);
+                   document.body.appendChild(overlay);
+                   overlay.onclick = () => overlay.remove();
+                 ">
+          </div>` : ''}
+        ${m.ubicacion ? `<div class="fi-loc" style="font-size:11px; color:var(--blue); margin-top:6px;">📍 ${m.ubicacion}</div>` : (m.body.includes('📍') ? `<div class="fi-loc">${m.body.split('📍')[1]}</div>` : '')}
         <div class="fi-actions">
            <button class="btn btn-ghost" style="font-size:10px;padding:2px 8px" onclick="verReporte('${m.id}')">Gestionar →</button>
         </div>
       `;
       feedEl.appendChild(card);
-    });
+      });
+    } // fin del else de itemsToRender
+
+    // Actualizar marcadores en el mapa con el array filtrado
+    import('./maps.js').then(m => m.updateWspMapMarkers(grupo, { [grupo]: itemsToRender })).catch(()=>{});
+
   } catch (err) {
     feedEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--red)">Error cargando feed</div>';
   }
@@ -67,8 +115,6 @@ export async function renderWspFeed(grupo) {
 
 export function switchWspGroup(grupo) {
   renderWspFeed(grupo);
-  // Update map if needed
-  import('./maps.js').then(m => m.updateWspMapMarkers(grupo, wspFeeds)).catch(()=>{});
 }
 window.switchWspGroup = switchWspGroup;
 
@@ -79,7 +125,7 @@ export async function refreshWspStats() {
     // 1. Actualizar conteos de mensajes por grupo
     if (data && data.porGerencia) {
       data.porGerencia.forEach(g => {
-        const countEl = document.getElementById(`wsp-count-${g.grupo}`);
+        const countEl = document.getElementById(`wsp-count-${g.area}`);
         if (countEl) {
           countEl.textContent = `${g.total || 0} msg`;
         }
@@ -288,20 +334,36 @@ export async function loadReportes() {
   if (!container) return;
 
   try {
+    const grupoFiltroEl = document.getElementById('rpt-filtro-grupo');
+    const user = api.getUser();
+    if (grupoFiltroEl) {
+      if (user && user.rol === 'admin') {
+        grupoFiltroEl.style.display = 'inline-block';
+      } else {
+        grupoFiltroEl.style.display = 'none';
+        grupoFiltroEl.value = 'todos';
+      }
+    }
+
     const estado = document.getElementById('rpt-filtro-estado')?.value || 'todos';
-    const grupo = document.getElementById('rpt-filtro-grupo')?.value || 'todos';
+    const grupo = grupoFiltroEl?.value || 'todos';
     const prioridad = document.getElementById('rpt-filtro-prioridad')?.value || 'todas';
+    const personal = (document.getElementById('rpt-filtro-personal')?.value || '').toLowerCase();
     const from = document.getElementById('filter-from')?.value;
     const to = document.getElementById('filter-to')?.value;
 
-    const { reportes, stats } = await api.getWhatsappReportes({ estado, grupo, prioridad, from, to });
+    let { reportes, stats } = await api.getWhatsappReportes({ estado, grupo, prioridad, from, to });
+
+    if (personal) {
+      reportes = reportes.filter(r => (r.reportadoPor || '').toLowerCase().includes(personal));
+    }
 
     // Actualizar Badge
-    const nuevosCount = reportes.filter(r => r.estado === 'nuevo').length;
+    const nuevosTotal = stats ? stats.nuevo : reportes.filter(r => r.estado === 'nuevo').length;
     const badge = document.getElementById('reportes-badge');
     if (badge) {
-      badge.textContent = nuevosCount;
-      badge.style.display = nuevosCount > 0 ? 'inline-block' : 'none';
+      badge.textContent = nuevosTotal;
+      badge.style.display = nuevosTotal > 0 ? 'inline-block' : 'none';
     }
 
     // KPIs
@@ -310,7 +372,7 @@ export async function loadReportes() {
         <div class="card card-accent" style="border-left-color:var(--red)"><div class="card-label">Nuevos</div><div class="card-value">${stats.nuevo || 0}</div></div>
         <div class="card card-accent" style="border-left-color:var(--amber)"><div class="card-label">En Proceso</div><div class="card-value">${stats.en_proceso || 0}</div></div>
         <div class="card card-accent" style="border-left-color:var(--green)"><div class="card-label">Atendidos</div><div class="card-value">${stats.atendido || 0}</div></div>
-        <div class="card card-accent" style="border-left-color:var(--blue)"><div class="card-label">Total</div><div class="card-value">${reportes.length}</div></div>
+        <div class="card card-accent" style="border-left-color:var(--blue)"><div class="card-label">Total</div><div class="card-value">${stats.total || 0}</div></div>
       `;
     }
 
@@ -328,6 +390,7 @@ export async function loadReportes() {
               <th>ID</th>
               <th>Fecha</th>
               <th>Mensaje de WhatsApp</th>
+              <th>Enviado Por</th>
               <th>Área / Categoría</th>
               <th>Prioridad</th>
               <th>Estado</th>
@@ -339,6 +402,7 @@ export async function loadReportes() {
                 <td style="font-family:monospace;font-size:10px">${r.idString || r.id}</td>
                 <td><div style="font-size:11px">${new Date(r.fecha).toLocaleDateString()}</div><div style="font-size:9px;color:var(--text-dim)">${new Date(r.fecha).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div></td>
                 <td><div style="font-size:11px; max-width:320px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--blue)" title="${r.mensaje}">${r.mensaje}</div></td>
+                <td><div style="font-size:11px; font-weight:600; color:var(--text-color)">${r.reportadoPor || 'Usuario Móvil'}</div></td>
                 <td>
                   <span class="badge badge-gray" style="font-size:9px">${(r.grupo || 'otros').toUpperCase()}</span>
                   <div style="font-weight:600;font-size:10px;margin-top:2px">${r.categoria || 'Sin Clasificar'}</div>
@@ -377,54 +441,62 @@ export async function verReporte(id) {
     const r = await api.getWhatsappReporte(id);
     
     content.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
         <div>
-          <h2 style="font-size:20px;margin-bottom:4px">Reporte ${r.idString || r.id}</h2>
-          <div style="font-size:12px;color:var(--text-dim)">${new Date(r.fecha).toLocaleString()}</div>
+          <h2 style="font-size:18px;margin-bottom:2px">Reporte ${r.idString || r.id}</h2>
+          <div style="font-size:11px;color:var(--text-dim)">${new Date(r.fecha).toLocaleString()}</div>
         </div>
-        <div style="display:flex; flex-direction:column; align-items:end; gap:8px">
-          <span class="status-pill status-${r.estado}" id="modal-status-badge" style="font-size:12px;padding:6px 12px">${r.estado.replace('_',' ').toUpperCase()}</span>
+        <span class="status-pill status-${r.estado}" id="modal-status-badge" style="font-size:11px;padding:5px 10px">${r.estado.replace('_',' ').toUpperCase()}</span>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px;">
+        <div class="card" style="padding:10px; background:rgba(255,255,255,0.02)">
+          <div style="font-size:9px; color:var(--text-muted); font-weight:700; margin-bottom:4px;">DATOS DEL CIUDADANO</div>
+          <div style="font-size:12px; margin-bottom:2px">👤 ${r.reportadoPor}</div>
+          <div style="font-size:11px; color:var(--blue)">📱 ${r.telefono || 'No disponible'}</div>
+        </div>
+        <div class="card" style="padding:10px; background:rgba(255,255,255,0.02)">
+          <div style="font-size:9px; color:var(--text-muted); font-weight:700; margin-bottom:4px;">CLASIFICACIÓN</div>
+          <div style="font-size:12px; margin-bottom:2px">📁 Area: ${(r.grupo || 'otros').toUpperCase()}</div>
+          <div style="font-size:11px; font-weight:600">🏷️ ${r.categoria || 'Sin Clasificar'}</div>
         </div>
       </div>
 
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:20px;">
-        <div class="card" style="padding:12px; background:rgba(255,255,255,0.02)">
-          <div style="font-size:10px; color:var(--text-muted); font-weight:700; margin-bottom:8px;">DATOS DEL CIUDADANO</div>
-          <div style="font-size:13px; margin-bottom:4px">👤 ${r.reportadoPor}</div>
-          <div style="font-size:12px; color:var(--blue)">📱 ${r.telefono || 'No disponible'}</div>
+      <div style="display:grid; grid-template-columns: ${r.fotoUrl && r.fotoUrl.length > 50 ? '1fr 200px' : '1fr'}; gap:12px; margin-bottom:12px;">
+        <div>
+          <div style="font-size:9px; color:var(--text-muted); font-weight:700; margin-bottom:4px;">MENSAJE RECIBIDO</div>
+          <textarea id="edit-mensaje-${r.id}" style="width:100%; padding:10px; background:var(--glass); border-radius:8px; font-size:12px; line-height:1.4; border-left:3px solid var(--blue); border-top:none; border-right:none; border-bottom:none; height:100%; min-height:60px; resize:vertical; outline:none;">${r.mensaje}</textarea>
         </div>
-        <div class="card" style="padding:12px; background:rgba(255,255,255,0.02)">
-          <div style="font-size:10px; color:var(--text-muted); font-weight:700; margin-bottom:8px;">CLASIFICACIÓN</div>
-          <div style="font-size:13px; margin-bottom:4px">📁 Area: ${(r.grupo || 'otros').toUpperCase()}</div>
-          <div style="font-size:12px; font-weight:600">🏷️ ${r.categoria || 'Sin Clasificar'}</div>
+        ${r.fotoUrl && r.fotoUrl.length > 50 ? `
+        <div>
+          <div style="font-size:9px; color:var(--text-muted); font-weight:700; margin-bottom:4px;">EVIDENCIA</div>
+          <div style="text-align:center; background:rgba(0,0,0,0.1); border-radius:8px; padding:6px; border:1px solid rgba(255,255,255,0.05)">
+            <img src="${r.fotoUrl.startsWith('http') || r.fotoUrl.startsWith('data:') ? r.fotoUrl : 'data:image/jpeg;base64,' + r.fotoUrl}" 
+                 style="max-width:100%; max-height:160px; border-radius:6px; cursor:zoom-in; box-shadow:0 6px 20px rgba(0,0,0,0.4)" 
+                 onclick="
+                   const overlay = document.createElement('div');
+                   overlay.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:999999; display:flex; justify-content:center; align-items:center; cursor:zoom-out;';
+                   const img = document.createElement('img');
+                   img.src = this.src;
+                   img.style.cssText = 'max-width:95%; max-height:95%; object-fit:contain; border-radius:8px; box-shadow:0 10px 50px rgba(0,0,0,0.8);';
+                   overlay.appendChild(img);
+                   document.body.appendChild(overlay);
+                   overlay.onclick = () => overlay.remove();
+                 ">
+          </div>
         </div>
+        ` : ''}
       </div>
 
-      <div style="margin-bottom:20px;">
-        <div style="font-size:10px; color:var(--text-muted); font-weight:700; margin-bottom:8px;">MENSAJE RECIBIDO</div>
-        <div style="padding:12px; background:var(--glass); border-radius:8px; font-size:13px; line-height:1.5; border-left:3px solid var(--blue)">
-          ${r.mensaje}
-        </div>
-      </div>
-
-      ${r.fotoUrl ? `
-      <div style="margin-bottom:20px;">
-        <div style="font-size:10px; color:var(--text-muted); font-weight:700; margin-bottom:8px;">EVIDENCIA FOTOGRÁFICA</div>
-        <div style="text-align:center; background:rgba(0,0,0,0.2); border-radius:12px; padding:10px; border:1px solid rgba(255,255,255,0.05)">
-          <img src="${r.fotoUrl.startsWith('data:') ? r.fotoUrl : 'data:image/jpeg;base64,' + r.fotoUrl}" style="max-width:100%; max-height:400px; border-radius:8px; cursor:zoom-in; box-shadow:0 10px 30px rgba(0,0,0,0.5)" onclick="window.open('${r.fotoUrl.startsWith('data:') ? r.fotoUrl : 'data:image/jpeg;base64,' + r.fotoUrl}', '_blank')">
-        </div>
-      </div>
-      ` : ''}
-
-      <div style="margin-bottom:20px; padding:16px; background:rgba(79,143,247,0.05); border-radius:12px; border:1px solid rgba(79,143,247,0.2)">
-        <div style="font-size:10px; color:var(--blue); font-weight:800; margin-bottom:12px;">📍 UBICACIÓN Y GESTIÓN</div>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+      <div style="margin-bottom:12px; padding:12px; background:rgba(79,143,247,0.05); border-radius:10px; border:1px solid rgba(79,143,247,0.2)">
+        <div style="font-size:9px; color:var(--blue); font-weight:800; margin-bottom:8px;">📍 UBICACIÓN Y GESTIÓN</div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
            <div>
-             <label style="display:block;font-size:10px;margin-bottom:4px">Dirección:</label>
+             <label style="display:block;font-size:9px;margin-bottom:2px">Dirección:</label>
              <input type="text" class="filter-select" id="edit-ubicacion-${r.id}" value="${r.ubicacion || ''}" style="width:100%" placeholder="Ej: Av. Central 123">
            </div>
            <div>
-             <label style="display:block;font-size:10px;margin-bottom:4px">Estado del Reporte:</label>
+             <label style="display:block;font-size:9px;margin-bottom:2px">Estado del Reporte:</label>
              <select class="filter-select" id="edit-estado-${r.id}" style="width:100%; font-weight:bold; color:var(--blue)">
                <option value="nuevo" ${r.estado==='nuevo'?'selected':''}>🔴 Nuevo (Sin atender)</option>
                <option value="en_proceso" ${r.estado==='en_proceso'?'selected':''}>🟡 En Proceso</option>
@@ -433,9 +505,9 @@ export async function verReporte(id) {
            </div>
         </div>
         
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:8px;">
            <div>
-             <label style="display:block;font-size:10px;margin-bottom:4px">Gerencia Responsable:</label>
+             <label style="display:block;font-size:9px;margin-bottom:2px">Gerencia Responsable:</label>
              <select class="filter-select" id="edit-grupo-${r.id}" style="width:100%">
                <option value="municipal" ${r.grupo==='municipal'?'selected':''}>Ger. Municipal</option>
                <option value="seguridad" ${r.grupo==='seguridad'?'selected':''}>Seg. Ciudadana</option>
@@ -452,7 +524,7 @@ export async function verReporte(id) {
              </select>
            </div>
            <div>
-             <label style="display:block;font-size:10px;margin-bottom:4px;color:var(--text-dim)">Coordenadas (Lat/Lng):</label>
+             <label style="display:block;font-size:9px;margin-bottom:2px;color:var(--text-dim)">Coordenadas (Lat/Lng):</label>
              <div style="display:flex; gap:4px">
                <input type="number" step="any" class="filter-select" id="edit-lat-${r.id}" value="${r.lat || ''}" style="width:100%" placeholder="Latitud">
                <input type="number" step="any" class="filter-select" id="edit-lng-${r.id}" value="${r.lng || ''}" style="width:100%" placeholder="Longitud">
@@ -460,14 +532,14 @@ export async function verReporte(id) {
            </div>
         </div>
         
-        <div style="display:flex; gap:8px; margin-top:16px;">
-          <button class="btn btn-primary" style="flex:2; height:44px; font-weight:bold" onclick="guardarUbicacion('${r.id}')">💾 GUARDAR CAMBIOS</button>
-          <button class="btn btn-ghost" style="flex:1; height:44px; font-size:11px; border-color:var(--green); color:var(--green)" onclick="autolocalizarGps('${r.id}')">📍 Autolocalizar GPS</button>
+        <div style="display:flex; gap:8px; margin-top:10px;">
+          <button class="btn btn-primary" style="flex:2; height:36px; font-weight:bold; font-size:11px" onclick="guardarUbicacion('${r.id}')">💾 GUARDAR CAMBIOS</button>
+          <button class="btn btn-ghost" style="flex:1; height:36px; font-size:10px; border-color:var(--green); color:var(--green)" onclick="autolocalizarGps('${r.id}')">📍 Autolocalizar GPS</button>
         </div>
       </div>
 
-      <div style="font-size:10px; color:var(--text-dim); margin-bottom:4px">Mapa Interactivo (Haz clic para señalar lugar exacto y obtener dirección)</div>
-      <div id="mini-map-${r.id}" style="height:320px; border-radius:12px; margin-bottom:10px; border:1px solid var(--border-light); cursor:crosshair; box-shadow: inset 0 0 10px rgba(0,0,0,0.5)"></div>
+      <div style="font-size:9px; color:var(--text-dim); margin-bottom:3px">Mapa Interactivo (Haz clic para señalar lugar exacto y obtener dirección)</div>
+      <div id="mini-map-${r.id}" style="height:220px; border-radius:10px; margin-bottom:6px; border:1px solid var(--border-light); cursor:crosshair; box-shadow: inset 0 0 10px rgba(0,0,0,0.5)"></div>
     `;
 
     modal.classList.add('show');
@@ -591,7 +663,6 @@ export async function refreshReportes() {
   await loadReportes();
   if (currentWspGroup) {
     await renderWspFeed(currentWspGroup);
-    import('./maps.js').then(m => m.updateWspMapMarkers(currentWspGroup, wspFeeds)).catch(()=>{});
   }
 }
 window.refreshReportes = refreshReportes;
@@ -613,16 +684,18 @@ export async function guardarUbicacion(id) {
     const ubicacion = document.getElementById(`edit-ubicacion-${id}`).value;
     const grupo = document.getElementById(`edit-grupo-${id}`).value;
     const estado = document.getElementById(`edit-estado-${id}`).value;
+    const mensaje = document.getElementById(`edit-mensaje-${id}`).value;
     
     await api.updateReporte(id, { 
       lat: lat ? parseFloat(lat) : null, 
       lng: lng ? parseFloat(lng) : null, 
       ubicacion,
       grupo,
-      estado
+      estado,
+      mensaje
     });
     
-    logActivity(`Reporte ${id}: ubicación y estado (${estado}) actualizados.`);
+    logActivity(`Reporte ${id}: mensaje, ubicación y estado (${estado}) actualizados.`);
     
     cerrarReporteModal();
     await refreshReportes();

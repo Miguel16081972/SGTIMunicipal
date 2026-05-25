@@ -12,6 +12,7 @@
   </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -56,6 +57,8 @@
       <div class="nav-section sb-hide">Herramientas</div>
       <div class="nav-item" onclick="showView('mapa')" data-view="mapa"><span class="dot"
           style="background:var(--text-muted)"></span><span class="sb-hide">Mapa Territorial</span></div>
+      <div class="nav-item" onclick="showView('mapadecalor')" data-view="mapadecalor"><span class="dot"
+          style="background:var(--amber)"></span><span class="sb-hide">Mapa de Calor</span></div>
       <div class="nav-item" onclick="showView('equipo')" data-view="equipo"><span class="dot"
           style="background:var(--cyan)"></span><span class="sb-hide">Gestión de Equipo</span></div>
       <div class="nav-item" onclick="showView('actividad')" data-view="actividad"><span class="dot"

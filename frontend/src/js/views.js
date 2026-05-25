@@ -111,7 +111,15 @@ export const views = `
     
     <div class="wsp-central-layout">
       <div class="wsp-content-col">
-        <div class="section-title"><span class="st-dot" style="background:var(--blue)"></span> <span id="wsp-feed-title">Feed — Gerencia Municipal</span></div>
+        <div class="section-title" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <div><span class="st-dot" style="background:var(--blue)"></span> <span id="wsp-feed-title">Feed - Gerencia Municipal</span></div>
+          <select id="feed-filtro-subarea" class="filter-select" style="font-size:10px; padding:4px; max-width:110px;" onchange="window.renderWspFeed(window.currentWspGroup)">
+            <option value="todos">Todas las áreas</option>
+            <option value="serenazgo">Serenazgo</option>
+            <option value="fiscalizacion">Fiscalización</option>
+            <option value="transporte">Transporte</option>
+          </select>
+        </div>
         <div class="wsp-feed-col"><div class="feed" id="wsp-feed"></div></div>
       </div>
       <div class="wsp-map-col">
@@ -131,6 +139,7 @@ export const views = `
          <select class="filter-select" id="rpt-filtro-estado" onchange="filtrarReportes()"><option value="todos">Estados</option><option value="nuevo">🔴 Nuevo</option><option value="en_proceso">🟡 Proceso</option><option value="atendido">🟢 Atendido</option></select>
          <select class="filter-select" id="rpt-filtro-grupo" onchange="filtrarReportes()">${filterOptions}</select>
          <select class="filter-select" id="rpt-filtro-prioridad" onchange="filtrarReportes()"><option value="todas">Prioridad</option><option value="Alta">🔴 Alta</option><option value="Media">🟡 Media</option><option value="Baja">🟢 Baja</option></select>
+         <input type="text" class="filter-select" id="rpt-filtro-personal" placeholder="👤 Buscar personal..." oninput="filtrarReportes()" style="width:140px; padding:4px 8px; font-size:11px;">
          <button class="top-btn" onclick="refreshReportes()">🔄 Actualizar</button>
          <div style="flex:1"></div>
          <div style="display:flex; gap:10px;">${adminPdf}</div>
@@ -164,7 +173,7 @@ export const views = `
     </div>
   </div>
 
-  <div class="modal-overlay" id="reporte-modal"><div class="modal" style="width:580px"><div id="reporte-modal-content"></div><div class="modal-actions" style="margin-top:16px"><button class="btn btn-ghost" onclick="cerrarReporteModal()">Cerrar</button></div></div></div>
+  <div class="modal-overlay" id="reporte-modal"><div class="modal" style="width:780px; max-height:90vh; overflow-y:auto"><div id="reporte-modal-content"></div><div class="modal-actions" style="margin-top:16px; position:sticky; bottom:0; background:var(--card-solid); padding:12px 0 0; border-top:1px solid var(--border-light)"><button class="btn btn-ghost" onclick="cerrarReporteModal()">Cerrar</button></div></div></div>
 </div>
 
 <!-- MAPA TERRITORIAL -->
@@ -174,6 +183,25 @@ export const views = `
     <div id="map-layer-btns" style="display:flex; gap:8px;"></div>
   </div>
   <div id="map-main" class="map-container" style="height:calc(100vh - 200px); border-radius:12px; position:relative;"></div>
+</div>
+
+<!-- MAPA DE CALOR -->
+<div class="view" id="view-mapadecalor">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+    <div class="section-title" style="margin:0;"><span class="st-dot" style="background:var(--amber)"></span> Mapa de Calor de Incidencias Georeferenciadas</div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <span style="font-size:11px; color:var(--text-muted); font-weight:600;">Filtrar por Grupo:</span>
+      <select id="heat-filtro-grupo" class="filter-select" onchange="window.actualizarMapaCalor()" style="padding:4px 8px; font-size:11px; min-width:160px; height:32px;">
+        <option value="todos">Todos los grupos</option>
+        <option value="seguridad">Seguridad Ciudadana</option>
+        <option value="ambiental">Desarrollo Ambiental</option>
+        <option value="rentas">Rentas / Eco</option>
+        <option value="urbano">Desarrollo Urbano</option>
+        <option value="humano">Desarrollo Humano</option>
+      </select>
+    </div>
+  </div>
+  <div id="map-heat" class="map-container" style="height:calc(100vh - 200px); border-radius:12px; position:relative;"></div>
 </div>
 
 <!-- ACTIVIDAD -->
@@ -339,10 +367,87 @@ export const views = `
 
       <!-- Lista de Personal -->
       <div class="card glass" style="padding:0; overflow:hidden;">
-        <div style="padding:16px; border-bottom:1px solid var(--border-light); background:rgba(0,0,0,0.02); font-weight:700; font-size:12px;">Personal Activo en Georeporte</div>
+        <div style="padding:12px 16px; border-bottom:1px solid var(--border-light); background:rgba(0,0,0,0.02); display:flex; justify-content:space-between; align-items:center; gap:8px;">
+          <span style="font-weight:700; font-size:12px;">Personal Activo en Georeporte</span>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="text" id="eq-search" class="filter-select" placeholder="🔍 Buscar por nombre..." style="padding:4px 8px; font-size:11px; width:180px;" oninput="window.filtrarEquipo()">
+            <select id="eq-filtro-subarea" class="filter-select" style="padding:4px 8px; font-size:11px; max-width:150px; display:none;" onchange="renderEquipoList()">
+              <option value="todos">Todas las sub-áreas</option>
+              <option value="serenazgo">Serenazgo</option>
+              <option value="fiscalizacion">Fiscalización</option>
+              <option value="transporte">Transporte</option>
+            </select>
+          </div>
+        </div>
         <div id="equipo-lista-container" style="max-height:500px; overflow-y:auto;">
            <div class="spinner-container" style="padding:40px;"><div class="spinner"></div></div>
         </div>
+      </div>
+    </div>
+
+    <!-- Panel de Supervisores por Turno -->
+    <div class="card glass" style="padding:24px; margin-top:20px;" id="panel-supervisores-turno">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h4 style="margin:0; display:flex; align-items:center; gap:8px;">🕐 Designar Supervisor de Campo por Turno</h4>
+        <span style="font-size:10px; color:var(--text-muted);">Cualquier personal u operador puede ser designado como Supervisor de Campo</span>
+      </div>
+      
+      <!-- Formulario de Asignación -->
+      <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; margin-bottom:24px; padding:16px; border-radius:8px; background:rgba(0,0,0,0.02); border:1px dashed var(--border-light);">
+        <div style="flex:2; min-width:250px;">
+          <label style="display:block; font-size:10px; font-weight:700; margin-bottom:6px; color:var(--text-muted); text-transform:uppercase;">1. Seleccionar Personal (Operador / Supervisor)</label>
+          <select id="sup-turno-personal" class="filter-select" style="width:100%; padding:10px; height:40px;">
+            <option value="">(Cargando personal...)</option>
+          </select>
+        </div>
+        <div style="flex:1; min-width:200px;">
+          <label style="display:block; font-size:10px; font-weight:700; margin-bottom:6px; color:var(--text-muted); text-transform:uppercase;">2. Seleccionar Turno</label>
+          <select id="sup-turno-tipo" class="filter-select" style="width:100%; padding:10px; height:40px;">
+            <option value="supervisor_manana">🌅 Turno Mañana (06:00 — 14:00)</option>
+            <option value="supervisor_tarde">☀️ Turno Tarde (14:00 — 22:00)</option>
+            <option value="supervisor_noche">🌙 Turno Noche (22:00 — 06:00)</option>
+          </select>
+        </div>
+        <div style="display:flex; align-items:center;">
+          <button class="btn btn-primary" style="padding:10px 24px; font-weight:700; height:40px; display:flex; align-items:center; gap:6px;" onclick="guardarSupervisorTurnoUnico()">
+            <span>💾 Asignar Turno</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Resumen de Asignaciones Actuales -->
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:16px;" id="supervisores-turno-resumen">
+        <!-- Turno Mañana -->
+        <div style="padding:16px; border-radius:10px; border:1px solid var(--border-light); background:linear-gradient(135deg, rgba(255,183,77,0.08), rgba(255,183,77,0.02)); display:flex; align-items:center; gap:12px;">
+          <span style="font-size:28px;">🌅</span>
+          <div>
+            <div style="font-weight:700; font-size:10px; color:var(--text-muted); letter-spacing:0.5px;">TURNO MAÑANA</div>
+            <div style="font-size:11px; color:var(--text-dim); margin-top:2px;">06:00 — 14:00</div>
+            <div id="resumen-sup-manana" style="font-weight:700; font-size:14px; color:var(--text-color); margin-top:6px;">(Sin asignar)</div>
+          </div>
+        </div>
+        <!-- Turno Tarde -->
+        <div style="padding:16px; border-radius:10px; border:1px solid var(--border-light); background:linear-gradient(135deg, rgba(66,165,245,0.08), rgba(66,165,245,0.02)); display:flex; align-items:center; gap:12px;">
+          <span style="font-size:28px;">☀️</span>
+          <div>
+            <div style="font-weight:700; font-size:10px; color:var(--text-muted); letter-spacing:0.5px;">TURNO TARDE</div>
+            <div style="font-size:11px; color:var(--text-dim); margin-top:2px;">14:00 — 22:00</div>
+            <div id="resumen-sup-tarde" style="font-weight:700; font-size:14px; color:var(--text-color); margin-top:6px;">(Sin asignar)</div>
+          </div>
+        </div>
+        <!-- Turno Noche -->
+        <div style="padding:16px; border-radius:10px; border:1px solid var(--border-light); background:linear-gradient(135deg, rgba(69,39,160,0.08), rgba(69,39,160,0.02)); display:flex; align-items:center; gap:12px;">
+          <span style="font-size:28px;">🌙</span>
+          <div>
+            <div style="font-weight:700; font-size:10px; color:var(--text-muted); letter-spacing:0.5px;">TURNO NOCHE</div>
+            <div style="font-size:11px; color:var(--text-dim); margin-top:2px;">22:00 — 06:00</div>
+            <div id="resumen-sup-noche" style="font-weight:700; font-size:14px; color:var(--text-color); margin-top:6px;">(Sin asignar)</div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="margin-top:16px; display:flex; justify-content:flex-end;">
+        <span id="sup-turno-msg" style="font-size:12px; font-weight:600;"></span>
       </div>
     </div>
   </div>

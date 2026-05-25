@@ -54,6 +54,45 @@ app.post('/api/upload', upload.single('photo'), (req, res) => {
 // ===== RUTAS PÚBLICAS =====
 app.use('/api/auth', require('./routes/auth'));
 
+// Ruta pública para ver las fotos desde Excel sin Token
+app.get('/api/whatsapp/foto/:id', async (req, res) => {
+  const { MensajeWhatsapp } = require('./database/models');
+  try {
+    const msg = await MensajeWhatsapp.findOne({ where: { idString: req.params.id } });
+    if (!msg || !msg.fotoUrl || msg.fotoUrl.length < 50) {
+      return res.status(404).send('<h2 style="text-align:center;font-family:sans-serif;margin-top:20%;color:#333;">No hay evidencia fotográfica para este reporte.</h2>');
+    }
+    
+    const foto = msg.fotoUrl.startsWith('http') || msg.fotoUrl.startsWith('data:') 
+      ? msg.fotoUrl 
+      : 'data:image/jpeg;base64,' + msg.fotoUrl;
+      
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Evidencia Reporte ${req.params.id}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          body { margin: 0; background-color: #0a0a0a; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: sans-serif; }
+          img { max-width: 95vw; max-height: 95vh; object-fit: contain; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: 8px; }
+          .back-btn { position: fixed; top: 20px; left: 20px; background: rgba(255,255,255,0.1); color: white; text-decoration: none; padding: 10px 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(5px); }
+          .back-btn:hover { background: rgba(255,255,255,0.2); }
+        </style>
+      </head>
+      <body>
+        <a href="javascript:window.close()" class="back-btn">Cerrar Pestaña</a>
+        <img src="${foto}" alt="Evidencia">
+      </body>
+      </html>
+    `;
+    res.send(html);
+  } catch (err) {
+    console.error('Error cargando foto:', err);
+    res.status(500).send('Error interno cargando la imagen.');
+  }
+});
+
 // ===== RUTAS PROTEGIDAS =====
 const { authMiddleware } = require('./middleware/auth');
 
@@ -70,15 +109,7 @@ app.use('/api/equipo', authMiddleware, require('./routes/equipo'));
 app.use('/api/reportes-movil', require('./routes/reportes-movil'));
 
 
-// ===== HEALTH CHECK =====
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    database: database.isConnected() ? 'connected' : 'memory',
-    version: '5.0.0',
-  });
-});
+app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
 
 // ===== ESTÁTICOS FRONTEND (PRODUCCIÓN) =====
 // Este bloque servirá tu app Vite ya compilada cuando esté en Hostinger

@@ -1,4 +1,4 @@
-// ===== SGTI Municipal — PDF Generator =====
+// ===== SGTI Municipal — PDF Generator (Versión Mejorada con Análisis Dinámico) =====
 import { logActivity } from './activity.js';
 import api from './api.js';
 
@@ -69,6 +69,10 @@ const EJE_CONFIG = {
   'CIAM (Adulto Mayor)': { eje: 'Atención al Adulto Mayor', desc: 'Programas de integración, salud y bienestar para la población de la tercera edad.' },
   'OMAPED (Discapacidad)': { eje: 'Inclusión y Discapacidad', desc: 'Gestión de beneficios, carnets CONADIS y apoyo a personas con habilidades diferentes.' },
   'Vaso de Leche / Comedor': { eje: 'Seguridad Alimentaria', desc: 'Distribución de alimentos y gestión de comedores populares para población vulnerable.' },
+  // ── NUEVAS CATEGORIAS PARA CAPTURAR MÁS DATOS ──
+  'Robo / Asalto': { eje: 'Seguridad y Patrullaje', desc: 'Atención y respuesta ante hechos delictivos de robo y asalto en la vía pública.' },
+  'Ruido Excesivo': { eje: 'Orden y Convivencia', desc: 'Fiscalización de contaminación sonora y control de establecimientos con exceso de ruido.' },
+  'Sin clasificar': { eje: 'Gestión Municipal General', desc: 'Reportes ciudadanos pendientes de clasificación temática por el sistema de gestión territorial.' },
 };
 
 const DEFAULT_EJE = { eje: 'Gestión Municipal Atendida', desc: 'Intervención protocolar para la resolución de reportes y quejas ciudadanas registradas.' };
@@ -78,7 +82,7 @@ const REPORT_TEXT_CONFIG = {
     title: 'Informe Estratégico de Gestión Territorial',
     intro: 'El presente documento consolida la operatividad de las unidades orgánicas en los 17 sectores de Carmen de la Legua Reynoso. El análisis se basa en el despliegue territorial inteligente para garantizar la gobernanza y eficiencia municipal.',
     recommendations: [
-      '• Optimizar la distribución de recursos operativos priorizando los sectores 3, 5 y 15 por su alta criticidad detectada.',
+      '• Optimizar la distribución de recursos operativos priorizando los sectores con mayor criticidad detectada.',
       '• Fortalecer el patrullaje sin fronteras en los sectores límite (6, 11 y 17) para reducir la incidencia delictiva externa.',
       '• Implementar un cronograma de mantenimiento de parques rotativo que cubra los 17 sectores en ciclos de 30 días.',
       '• Digitalizar el catastro en los sectores industriales (5 y 8) para elevar la recaudación tributaria en un 15%.'
@@ -88,9 +92,9 @@ const REPORT_TEXT_CONFIG = {
     title: 'Informe Operativo de Seguridad Ciudadana',
     intro: 'Análisis de patrullaje y prevención delictiva con enfoque sectorizado. Se detalla el cumplimiento de metas de vigilancia y control de la vía pública en los puntos calientes del distrito.',
     recommendations: [
-      '• Desplegar brigadas motorizadas de respuesta rápida en el Sector 1 y 4 durante los cambios de turno comercial.',
-      '• Instalar botones de pánico inteligentes en los parques principales de los sectores 2, 7 y 14.',
-      '• Realizar operativos de control de identidad focalizados en el Sector 6 (Límite Gambetta) para disuadir ingresos no autorizados.',
+      '• Desplegar brigadas motorizadas de respuesta rápida en los sectores con mayor incidencia durante los cambios de turno comercial.',
+      '• Instalar botones de pánico inteligentes en los parques principales de los sectores con mayor número de reportes.',
+      '• Realizar operativos de control de identidad focalizados en los sectores fronterizos para disuadir ingresos no autorizados.',
       '• Capacitar a los vigilantes de cuadra en el uso del aplicativo SGTI para reportes inmediatos.'
     ]
   },
@@ -98,10 +102,10 @@ const REPORT_TEXT_CONFIG = {
     title: 'Informe de Gestión Ambiental y Salubridad',
     intro: 'Estado situacional de la limpieza pública y ornato. Se monitorea la erradicación de puntos críticos de basura y la salud ambiental en los 17 sectores territoriales.',
     recommendations: [
-      '• Implementar "ECO-Rutas" de reciclaje diferenciado iniciando por los sectores residenciales 9 y 13.',
-      '• Recuperar los espacios públicos degradados en el Sector 15 mediante arborización y mobiliario urbano.',
-      '• Sancionar mediante cámaras térmicas el arrojo de desmonte nocturno en el eje de la Av. Morales Duárez (Sector 4).',
-      '• Intensificar el barrido de calles en los sectores comerciales 1 y 12 tras el cierre de jornada.'
+      '• Implementar "ECO-Rutas" de reciclaje diferenciado iniciando por los sectores residenciales con mayor densidad.',
+      '• Recuperar los espacios públicos degradados mediante arborización y mobiliario urbano.',
+      '• Sancionar mediante cámaras térmicas el arrojo de desmonte nocturno en los puntos críticos detectados.',
+      '• Intensificar el barrido de calles en los sectores comerciales tras el cierre de jornada.'
     ]
   },
   rentas: {
@@ -109,8 +113,8 @@ const REPORT_TEXT_CONFIG = {
     intro: 'Indicadores de recaudación y fiscalización económica. Se analiza la salud financiera y la formalización comercial bajo el marco de la inteligencia territorial.',
     recommendations: [
       '• Realizar campañas itinerantes de "Rentas en tu Sector" visitando semanalmente los 17 sectores del distrito.',
-      '• Fiscalizar el uso de vía pública por sobre-stock en las empresas del Sector Industrial (8).',
-      '• Automatizar las licencias de funcionamiento de bajo riesgo para los emprendedores de los sectores 10 y 14.',
+      '• Fiscalizar el uso de vía pública por sobre-stock en las empresas del Sector Industrial.',
+      '• Automatizar las licencias de funcionamiento de bajo riesgo para los emprendedores locales.',
       '• Iniciar procesos de cobranza coactiva solo tras agotar la etapa de sensibilización personalizada en campo.'
     ]
   },
@@ -118,19 +122,19 @@ const REPORT_TEXT_CONFIG = {
     title: 'Informe de Desarrollo Urbano y Ornato',
     intro: 'Seguimiento de obras públicas y mantenimiento de la infraestructura urbana. La prioridad es la conectividad y el estado óptimo del catastro municipal.',
     recommendations: [
-      '• Ejecutar el plan maestro de bacheo iniciando por las vías colectoras de los sectores 16 y 17.',
-      '• Modernizar el mobiliario urbano de la Plaza Grau (Sector 1) manteniendo su valor histórico.',
-      '• Revisar las autorizaciones de construcción en el Sector 5 para asegurar el cumplimiento del retiro municipal.',
-      '• Implementar un sistema de riego tecnificado en los parques del corredor central (Sectores 3 y 7).'
+      '• Ejecutar el plan maestro de bacheo iniciando por las vías colectoras con mayor tráfico.',
+      '• Modernizar el mobiliario urbano de los sectores históricos manteniendo su valor patrimonial.',
+      '• Revisar las autorizaciones de construcción para asegurar el cumplimiento del retiro municipal.',
+      '• Implementar un sistema de riego tecnificado en los parques del corredor central.'
     ]
   },
   humano: {
     title: 'Informe de Bienestar y Desarrollo Humano',
     intro: 'Impacto de los programas sociales y servicios de salud. El enfoque territorial asegura que la ayuda llegue a las zonas con mayores indicadores de vulnerabilidad.',
     recommendations: [
-      '• Ampliar la cobertura de "Vaso de Leche" en los asentamientos del Sector 15.',
+      '• Ampliar la cobertura de "Vaso de Leche" en los asentamientos vulnerables.',
       '• Implementar tele-salud para adultos mayores del CIAM que residen en los sectores alejados de la central.',
-      '• Fomentar la creación de bio-huertos escolares en las instituciones de los sectores 2 y 9.',
+      '• Fomentar la creación de bio-huertos escolares en las instituciones educativas del distrito.',
       '• Organizar ferias de servicios integrales (Salud, DEMUNA, OMAPED) de forma rotativa en los 17 sectores.'
     ]
   },
@@ -138,7 +142,7 @@ const REPORT_TEXT_CONFIG = {
     title: 'Informe Detallado de Participación Vecinal',
     intro: 'La Subgerencia de Participación Vecinal reporta el estado situacional de sus 4 ejes principales: OPC, DEMUNA, CIAM y OMAPED.',
     recommendations: [
-      '• Ejecutar jornadas de sensibilización "Casa por Casa" sobre violencia familiar en coordinación con DEMUNA en el Sector 4.',
+      '• Ejecutar jornadas de sensibilización "Casa por Casa" sobre violencia familiar en coordinación con DEMUNA.',
       '• Automatizar el registro de asistencia y monitoreo de salud para los miembros del CIAM mediante códigos QR.',
       '• Establecer convenios con empresas del sector industrial para la inserción laboral de personas registradas en OMAPED.',
       '• Renovar la directiva de las Juntas Vecinales en los sectores donde la participación ciudadana ha disminuido según el feed.'
@@ -171,6 +175,128 @@ const GROUP_AXIS_WHITELIST = {
   general: null // Permite todos los ejes
 };
 
+// ===== HELPERS PARA ANÁLISIS DINÁMICO =====
+
+function calcularDiasPeriodo(from, to) {
+  const d1 = new Date(from);
+  const d2 = new Date(to);
+  return Math.max(1, Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24)) + 1);
+}
+
+function calcularPromediosDiarios(reportes, dias) {
+  return (reportes.length / dias).toFixed(1);
+}
+
+function obtenerDistribucionPorEstado(reportes) {
+  const estados = { nuevo: 0, en_proceso: 0, atendido: 0 };
+  reportes.forEach(r => {
+    if (estados[r.estado] !== undefined) estados[r.estado]++;
+    else estados.nuevo++;
+  });
+  return estados;
+}
+
+function obtenerDistribucionPorPrioridad(reportes) {
+  const prioridades = { Alta: 0, Media: 0, Baja: 0 };
+  reportes.forEach(r => {
+    if (prioridades[r.prioridad] !== undefined) prioridades[r.prioridad]++;
+    else prioridades.Media++;
+  });
+  return prioridades;
+}
+
+function obtenerDistribucionPorCategoria(reportes) {
+  const categorias = {};
+  reportes.forEach(r => {
+    const cat = r.categoria || 'Sin clasificar';
+    categorias[cat] = (categorias[cat] || 0) + 1;
+  });
+  return Object.entries(categorias).sort((a, b) => b[1] - a[1]);
+}
+
+function obtenerVolumenDiario(reportes) {
+  const porDia = {};
+  reportes.forEach(r => {
+    const dia = new Date(r.fecha).toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+    porDia[dia] = (porDia[dia] || 0) + 1;
+  });
+  return Object.entries(porDia).sort((a, b) => b[1] - a[1]);
+}
+
+function obtenerHorasPico(reportes) {
+  const porHora = {};
+  reportes.forEach(r => {
+    const hora = new Date(r.fecha).getHours();
+    const rango = `${String(hora).padStart(2, '0')}:00 - ${String(hora).padStart(2, '0')}:59`;
+    porHora[rango] = (porHora[rango] || 0) + 1;
+  });
+  return Object.entries(porHora).sort((a, b) => b[1] - a[1]).slice(0, 5);
+}
+
+function generarIntroduccionDinamica(config, reportes, dias, grupo) {
+  const total = reportes.length;
+  const promedio = calcularPromediosDiarios(reportes, dias);
+  const estados = obtenerDistribucionPorEstado(reportes);
+  const prioridades = obtenerDistribucionPorPrioridad(reportes);
+  const tasaAtencion = total > 0 ? ((estados.atendido / total) * 100).toFixed(1) : '0';
+  
+  let intro = config.intro;
+  intro += ` Durante el periodo analizado de ${dias} días, se registraron un total de ${total.toLocaleString('es-PE')} incidencias, con un promedio de ${promedio} reportes diarios.`;
+  intro += ` Del total, ${estados.atendido.toLocaleString('es-PE')} fueron atendidos (${tasaAtencion}% de tasa de resolución), ${estados.en_proceso.toLocaleString('es-PE')} se encuentran en proceso y ${estados.nuevo.toLocaleString('es-PE')} están pendientes de gestión.`;
+  
+  if (prioridades.Alta > 0) {
+    const pctAlta = ((prioridades.Alta / total) * 100).toFixed(1);
+    intro += ` Se identificaron ${prioridades.Alta.toLocaleString('es-PE')} incidencias de prioridad Alta (${pctAlta}%), requiriendo atención inmediata.`;
+  }
+  
+  return intro;
+}
+
+function generarRecomendacionesDinamicas(config, reportes, sectorStats, ejeSummary) {
+  const recomendaciones = [];
+  
+  // Recomendación basada en el sector con más incidencias
+  const topSectores = Object.entries(sectorStats).sort((a, b) => b[1] - a[1]);
+  if (topSectores.length > 0) {
+    recomendaciones.push(`• Priorizar la intervención en ${topSectores[0][0]} que concentra ${topSectores[0][1].toLocaleString('es-PE')} incidencias (${((topSectores[0][1] / reportes.length) * 100).toFixed(1)}% del total), siendo el sector más demandante del periodo.`);
+  }
+  
+  // Recomendación basada en prioridades altas
+  const prioridades = obtenerDistribucionPorPrioridad(reportes);
+  if (prioridades.Alta > 0) {
+    recomendaciones.push(`• Atender con urgencia las ${prioridades.Alta.toLocaleString('es-PE')} incidencias clasificadas como Alta prioridad, desplegando equipos de respuesta rápida en las zonas más afectadas.`);
+  }
+  
+  // Recomendación basada en tasa de resolución
+  const estados = obtenerDistribucionPorEstado(reportes);
+  const tasaResolucion = reportes.length > 0 ? (estados.atendido / reportes.length) * 100 : 0;
+  if (tasaResolucion < 50) {
+    recomendaciones.push(`• Incrementar la capacidad operativa para mejorar la tasa de resolución actual del ${tasaResolucion.toFixed(1)}%. Se recomienda un mínimo del 70% de atención en el próximo periodo.`);
+  } else {
+    recomendaciones.push(`• Mantener y optimizar la tasa de resolución actual del ${tasaResolucion.toFixed(1)}%, implementando métricas de calidad de servicio además de cantidad.`);
+  }
+
+  // Recomendación sobre reportes pendientes
+  if (estados.nuevo > 0) {
+    recomendaciones.push(`• Gestionar los ${estados.nuevo.toLocaleString('es-PE')} reportes pendientes (estado "nuevo") con un plan de atención escalonado para reducir el tiempo de respuesta ciudadano.`);
+  }
+  
+  // Agregar recomendaciones fijas del grupo
+  config.recommendations.forEach(r => recomendaciones.push(r));
+  
+  return recomendaciones;
+}
+
+// ===== HELPER DE PAGINACIÓN =====
+function checkPageBreak(doc, y, requiredSpace = 30) {
+  const pageHeight = doc.internal.pageSize.getHeight();
+  if (y + requiredSpace > pageHeight - 20) {
+    doc.addPage();
+    return 20;
+  }
+  return y;
+}
+
 export async function generateReportesPdf(grupo) {
   logActivity('Generando Informe Territorial Premium: ' + grupo);
   
@@ -196,65 +322,114 @@ export async function generateReportesPdf(grupo) {
     const filters = grupo === 'general' ? {} : { grupo };
     if (from) filters.from = from;
     if (to) filters.to = to;
+    filters.limit = 'all'; // Extraer toda la data para el PDF
 
     const { stats, reportes } = await api.getWhatsappReportes(filters);
     
-    // Filtrar reportes por Ejes permitidos para esta área (Coherencia Temática)
+    // Usar TODOS los reportes del periodo para el análisis completo
+    // (No filtramos por whitelist para el análisis, solo para la tabla de ejes específicos)
     const whitelist = GROUP_AXIS_WHITELIST[grupo];
     const filteredReportes = whitelist 
       ? reportes.filter(r => whitelist.includes((EJE_CONFIG[r.categoria] || DEFAULT_EJE).eje))
       : reportes;
+
+    // Calcular métricas dinámicas
+    const diasPeriodo = calcularDiasPeriodo(from, to);
+    const promedioDiario = calcularPromediosDiarios(reportes, diasPeriodo);
+    const estados = obtenerDistribucionPorEstado(reportes);
+    const prioridades = obtenerDistribucionPorPrioridad(reportes);
+    const categorias = obtenerDistribucionPorCategoria(reportes);
+    const horasPico = obtenerHorasPico(reportes);
+    const volumenDiario = obtenerVolumenDiario(reportes);
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
     const w = doc.internal.pageSize.getWidth();
     
     // ===== CAPA 1: PORTADA / CABECERA EJECUTIVA =====
-    doc.setFillColor(8, 13, 26); doc.rect(0, 0, w, 48, 'F');
+    doc.setFillColor(8, 13, 26); doc.rect(0, 0, w, 52, 'F');
     doc.setTextColor(255, 255, 255); doc.setFontSize(18); doc.setFont(undefined, 'bold');
     
     // Título específico
-    doc.text(config.title.toUpperCase(), 14, 18);
-    doc.setFontSize(14);
+    doc.text(config.title.toUpperCase(), 14, 16);
+    doc.setFontSize(13);
     doc.setTextColor(79, 143, 247); // Color azul SGTI
-    doc.text(isWeeklyDefault ? 'REPORTE SEMANAL DE GESTIÓN TERRITORIAL' : 'REPORTE ESTRATÉGICO DE GESTIÓN', 14, 26);
+    doc.text(isWeeklyDefault ? 'REPORTE SEMANAL DE GESTIÓN TERRITORIAL' : 'REPORTE ESTRATÉGICO DE GESTIÓN', 14, 24);
     
-    doc.setDrawColor(79, 143, 247); doc.setLineWidth(0.8); doc.line(14, 30, 60, 30);
+    doc.setDrawColor(79, 143, 247); doc.setLineWidth(0.8); doc.line(14, 28, 60, 28);
     
     doc.setTextColor(255, 255, 255); doc.setFontSize(9); doc.setFont(undefined, 'normal');
-    doc.text(`Destinatario: Alcalde de Carmen de la Legua Reynoso`, 14, 38);
-    doc.text(`Unidad: Gerencia de ${grupo === 'general' ? 'Gestión Territorial' : grupo.charAt(0).toUpperCase() + grupo.slice(1)}`, 110, 38);
+    doc.text(`Destinatario: Alcalde de Carmen de la Legua Reynoso`, 14, 34);
+    doc.text(`Unidad: Gerencia de ${grupo === 'general' ? 'Gestión Territorial' : grupo.charAt(0).toUpperCase() + grupo.slice(1)}`, 110, 34);
     
     const formatDate = (dateStr) => {
       const [y, m, d] = dateStr.split('-');
       return `${d}/${m}/${y}`;
     };
 
-    const dateRangeText = `Periodo: del ${formatDate(from)} al ${formatDate(to)}`;
+    const dateRangeText = `Periodo: del ${formatDate(from)} al ${formatDate(to)} (${diasPeriodo} días)`;
       
     doc.setFont(undefined, 'bold');
-    doc.text(dateRangeText, 14, 43);
+    doc.text(dateRangeText, 14, 40);
     doc.setFont(undefined, 'normal');
-    doc.text(`Muestra: ${reportes.length} incidencias analizadas`, 110, 43);
+    doc.text(`Muestra: ${reportes.length.toLocaleString('es-PE')} incidencias analizadas`, 110, 40);
+
+    // KPIs en la cabecera
+    doc.setFontSize(8);
+    doc.text(`Promedio diario: ${promedioDiario} reportes | Alta prioridad: ${prioridades.Alta} | Tasa resolución: ${reportes.length > 0 ? ((estados.atendido / reportes.length) * 100).toFixed(1) : 0}%`, 14, 47);
 
     doc.setTextColor(40, 40, 40);
-    let y = 60;
+    let y = 62;
 
-    // ===== SECCIÓN 1: RESUMEN DE OPERATIVIDAD =====
+    // ===== SECCIÓN 1: RESUMEN DE OPERATIVIDAD (DINÁMICO) =====
     doc.setFontSize(14); doc.setFont(undefined, 'bold'); doc.text('1. Resumen de Operatividad y Despliegue', 14, y); y += 8;
     doc.setFontSize(10); doc.setFont(undefined, 'normal');
     
-    // Introducción específica
-    const splitIntro = doc.splitTextToSize(config.intro, w - 28);
+    // Introducción DINÁMICA que incorpora los datos reales
+    const introText = generarIntroduccionDinamica(config, reportes, diasPeriodo, grupo);
+    const splitIntro = doc.splitTextToSize(introText, w - 28);
     doc.text(splitIntro, 14, y);
-    y += (splitIntro.length * 5) + 8;
+    y += (splitIntro.length * 5) + 6;
+
+    // ===== SECCIÓN 1.1: CUADRO DE INDICADORES CLAVE =====
+    y = checkPageBreak(doc, y, 40);
+    doc.setFontSize(11); doc.setFont(undefined, 'bold'); doc.text('1.1 Indicadores Clave del Periodo', 14, y); y += 6;
+
+    const kpiData = [
+      ['Indicador', 'Valor', 'Observación'],
+      ['Total de Incidencias', reportes.length.toLocaleString('es-PE'), `En ${diasPeriodo} días de operación`],
+      ['Promedio Diario', promedioDiario, `Volumen de reportes por día`],
+      ['Incidencias Atendidas', estados.atendido.toLocaleString('es-PE'), `${reportes.length > 0 ? ((estados.atendido / reportes.length) * 100).toFixed(1) : 0}% tasa de resolución`],
+      ['Incidencias En Proceso', estados.en_proceso.toLocaleString('es-PE'), `${reportes.length > 0 ? ((estados.en_proceso / reportes.length) * 100).toFixed(1) : 0}% del total`],
+      ['Incidencias Pendientes', estados.nuevo.toLocaleString('es-PE'), `${reportes.length > 0 ? ((estados.nuevo / reportes.length) * 100).toFixed(1) : 0}% requieren atención`],
+      ['Prioridad Alta', prioridades.Alta.toLocaleString('es-PE'), `${reportes.length > 0 ? ((prioridades.Alta / reportes.length) * 100).toFixed(1) : 0}% del total`],
+      ['Prioridad Media', prioridades.Media.toLocaleString('es-PE'), `${reportes.length > 0 ? ((prioridades.Media / reportes.length) * 100).toFixed(1) : 0}% del total`],
+      ['Prioridad Baja', prioridades.Baja.toLocaleString('es-PE'), `${reportes.length > 0 ? ((prioridades.Baja / reportes.length) * 100).toFixed(1) : 0}% del total`],
+    ];
+
+    doc.autoTable({
+      startY: y,
+      head: [kpiData[0]],
+      body: kpiData.slice(1),
+      styles: { fontSize: 8, cellPadding: 3, valign: 'middle' },
+      headStyles: { fillColor: [8, 13, 26], textColor: [255, 255, 255], fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 50, fontStyle: 'bold' },
+        1: { cellWidth: 35, halign: 'center', fontStyle: 'bold', textColor: [79, 143, 247] },
+        2: { cellWidth: 'auto' }
+      },
+      margin: { left: 14, right: 14 }
+    });
+
+    y = doc.lastAutoTable.finalY + 10;
 
     // ===== SECCIÓN 2: ANÁLISIS DE INTERVENCIONES POR EJES =====
+    y = checkPageBreak(doc, y, 40);
     doc.setFontSize(14); doc.setFont(undefined, 'bold'); doc.text('2. Análisis de Intervenciones por Ejes de Gestión', 14, y); y += 6;
     
-    // Agregación por Eje
+    // Agregación por Eje — Usar TODOS los reportes (no filtrados) para dar contexto completo
     const ejeSummary = {};
-    filteredReportes.forEach(r => {
+    reportes.forEach(r => {
       const eConfig = EJE_CONFIG[r.categoria] || DEFAULT_EJE;
       if (!ejeSummary[eConfig.eje]) {
         ejeSummary[eConfig.eje] = { count: 0, desc: eConfig.desc };
@@ -262,65 +437,230 @@ export async function generateReportesPdf(grupo) {
       ejeSummary[eConfig.eje].count++;
     });
 
-    const tableBody = Object.entries(ejeSummary).map(([eje, data]) => [
-      eje,
-      data.count.toLocaleString('es-PE'),
-      data.desc
-    ]);
+    const tableBody = Object.entries(ejeSummary)
+      .sort((a, b) => b[1].count - a[1].count)
+      .map(([eje, data]) => [
+        eje,
+        data.count.toLocaleString('es-PE'),
+        `${reportes.length > 0 ? ((data.count / reportes.length) * 100).toFixed(1) : 0}%`,
+        data.desc
+      ]);
 
-    doc.autoTable({
-      startY: y,
-      head: [['Eje de Intervención', 'Frecuencia', 'Descripción de Actividades']],
-      body: tableBody,
-      styles: { fontSize: 8, cellPadding: 4, valign: 'middle' },
-      headStyles: { fillColor: [240, 240, 240], textColor: [40, 40, 40], fontStyle: 'bold' },
-      columnStyles: {
-        0: { cellWidth: 45, fontStyle: 'bold' },
-        1: { cellWidth: 25, halign: 'center' },
-        2: { cellWidth: 'auto' }
-      },
-      margin: { left: 14, right: 14 }
-    });
+    if (tableBody.length > 0) {
+      doc.autoTable({
+        startY: y,
+        head: [['Eje de Intervención', 'Cantidad', '% del Total', 'Descripción de Actividades']],
+        body: tableBody,
+        styles: { fontSize: 7.5, cellPadding: 3.5, valign: 'middle' },
+        headStyles: { fillColor: [240, 240, 240], textColor: [40, 40, 40], fontStyle: 'bold' },
+        columnStyles: {
+          0: { cellWidth: 42, fontStyle: 'bold' },
+          1: { cellWidth: 20, halign: 'center' },
+          2: { cellWidth: 20, halign: 'center' },
+          3: { cellWidth: 'auto' }
+        },
+        margin: { left: 14, right: 14 }
+      });
+      y = doc.lastAutoTable.finalY + 10;
+    } else {
+      doc.setFontSize(9); doc.setFont(undefined, 'normal');
+      doc.text('No se registraron intervenciones clasificadas por eje en este periodo.', 14, y);
+      y += 8;
+    }
 
-    y = doc.lastAutoTable.finalY + 12;
+    // ===== SECCIÓN 2.1: DESGLOSE POR CATEGORÍA ESPECÍFICA =====
+    y = checkPageBreak(doc, y, 40);
+    doc.setFontSize(11); doc.setFont(undefined, 'bold'); doc.text('2.1 Desglose por Categoría de Incidencia', 14, y); y += 6;
+
+    if (categorias.length > 0) {
+      const catTableBody = categorias.map(([cat, count]) => [
+        cat,
+        count.toLocaleString('es-PE'),
+        `${((count / reportes.length) * 100).toFixed(1)}%`,
+        (EJE_CONFIG[cat] || DEFAULT_EJE).eje
+      ]);
+
+      doc.autoTable({
+        startY: y,
+        head: [['Categoría', 'Cantidad', '% del Total', 'Eje Asignado']],
+        body: catTableBody,
+        styles: { fontSize: 7.5, cellPadding: 3, valign: 'middle' },
+        headStyles: { fillColor: [79, 143, 247], textColor: [255, 255, 255], fontStyle: 'bold' },
+        columnStyles: {
+          0: { cellWidth: 50, fontStyle: 'bold' },
+          1: { cellWidth: 22, halign: 'center' },
+          2: { cellWidth: 22, halign: 'center' },
+          3: { cellWidth: 'auto' }
+        },
+        margin: { left: 14, right: 14 }
+      });
+      y = doc.lastAutoTable.finalY + 10;
+    }
 
     // ===== SECCIÓN 3: DISTRIBUCIÓN TERRITORIAL (17 SECTORES) =====
+    y = checkPageBreak(doc, y, 40);
     doc.setFontSize(14); doc.setFont(undefined, 'bold'); doc.text('3. Análisis de Incidencia por Sectores Oficiales', 14, y); y += 8;
     
     // Agregación por Sector con nombres reales
     const sectorStats = {};
     reportes.forEach(r => {
-      const realName = SECTOR_NAMES[r.sector] || r.sector || 'Zonas No Delimitadas';
+      const sectorKey = r.sector || 'Sin sector';
+      const realName = SECTOR_NAMES[sectorKey] || sectorKey || 'Sin sector';
       sectorStats[realName] = (sectorStats[realName] || 0) + 1;
     });
 
-    const topZones = Object.entries(sectorStats).sort((a,b) => b[1]-a[1]).slice(0, 5);
+    // Tabla completa de sectores
+    const sectorTableBody = Object.entries(sectorStats)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count], idx) => [
+        `${idx + 1}`,
+        name,
+        count.toLocaleString('es-PE'),
+        `${((count / reportes.length) * 100).toFixed(1)}%`,
+        zoneDescriptions[name] || 'Sector bajo monitoreo territorial.'
+      ]);
+
+    if (sectorTableBody.length > 0) {
+      doc.autoTable({
+        startY: y,
+        head: [['#', 'Sector / Zona', 'Incidencias', '% Total', 'Caracterización']],
+        body: sectorTableBody,
+        styles: { fontSize: 7, cellPadding: 3, valign: 'middle', overflow: 'linebreak' },
+        headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255], fontStyle: 'bold' },
+        columnStyles: {
+          0: { cellWidth: 8, halign: 'center' },
+          1: { cellWidth: 42, fontStyle: 'bold' },
+          2: { cellWidth: 22, halign: 'center' },
+          3: { cellWidth: 18, halign: 'center' },
+          4: { cellWidth: 'auto', fontStyle: 'italic', fontSize: 6.5 }
+        },
+        margin: { left: 14, right: 14 }
+      });
+      y = doc.lastAutoTable.finalY + 8;
+    }
+
+    // Análisis escrito de los Top 3 sectores
+    y = checkPageBreak(doc, y, 30);
+    const topZones = Object.entries(sectorStats).sort((a,b) => b[1]-a[1]).slice(0, 3);
     
-    doc.setFontSize(10); doc.setFont(undefined, 'normal');
-    
-    topZones.forEach(([name, count], idx) => {
-      doc.setFont(undefined, 'bold'); doc.text(`${idx + 1}. ${name} (${count} incidencias):`, 14, y);
-      doc.setFont(undefined, 'normal');
-      const zoneDesc = zoneDescriptions[name] || `Sector estratégico que requiere monitoreo preventivo según la tendencia detectada en el sistema de gestión territorial.`;
+    if (topZones.length > 0) {
+      doc.setFontSize(10); doc.setFont(undefined, 'bold');
+      doc.text('Sectores Críticos (Mayor concentración):', 14, y); y += 6;
+      doc.setFontSize(9); doc.setFont(undefined, 'normal');
       
-      const splitZoneDesc = doc.splitTextToSize(zoneDesc, w - 28);
-      doc.text(splitZoneDesc, 14, y + 4.5);
-      y += (splitZoneDesc.length * 5) + 6;
-      
-      if (y > 270) { doc.addPage(); y = 20; }
+      topZones.forEach(([name, count], idx) => {
+        y = checkPageBreak(doc, y, 14);
+        const pct = ((count / reportes.length) * 100).toFixed(1);
+        doc.setFont(undefined, 'bold'); doc.text(`${idx + 1}. ${name}:`, 14, y);
+        doc.setFont(undefined, 'normal');
+        const zoneAnalysis = `${count.toLocaleString('es-PE')} incidencias (${pct}% del total). ${zoneDescriptions[name] || 'Zona que requiere monitoreo preventivo según la tendencia detectada.'}`;
+        const splitAnalysis = doc.splitTextToSize(zoneAnalysis, w - 28);
+        doc.text(splitAnalysis, 14, y + 4.5);
+        y += (splitAnalysis.length * 4.5) + 6;
+      });
+    }
+
+    // ===== SECCIÓN 4: ANÁLISIS TEMPORAL =====
+    y = checkPageBreak(doc, y, 50);
+    doc.setFontSize(14); doc.setFont(undefined, 'bold'); doc.text('4. Análisis Temporal y Patrones de Reporte', 14, y); y += 8;
+
+    // 4.1 Horarios pico
+    if (horasPico.length > 0) {
+      doc.setFontSize(11); doc.setFont(undefined, 'bold'); doc.text('4.1 Horarios de Mayor Actividad', 14, y); y += 6;
+
+      doc.autoTable({
+        startY: y,
+        head: [['Rango Horario', 'Cantidad de Reportes', '% del Total']],
+        body: horasPico.map(([hora, count]) => [
+          hora,
+          count.toLocaleString('es-PE'),
+          `${((count / reportes.length) * 100).toFixed(1)}%`
+        ]),
+        styles: { fontSize: 8, cellPadding: 3, valign: 'middle' },
+        headStyles: { fillColor: [240, 240, 240], textColor: [40, 40, 40], fontStyle: 'bold' },
+        columnStyles: {
+          0: { cellWidth: 50, fontStyle: 'bold' },
+          1: { cellWidth: 50, halign: 'center' },
+          2: { cellWidth: 'auto', halign: 'center' }
+        },
+        margin: { left: 14, right: 14 }
+      });
+      y = doc.lastAutoTable.finalY + 8;
+    }
+
+    // 4.2 Días con mayor volumen
+    if (volumenDiario.length > 0) {
+      y = checkPageBreak(doc, y, 40);
+      doc.setFontSize(11); doc.setFont(undefined, 'bold'); doc.text('4.2 Días con Mayor Volumen de Reportes', 14, y); y += 6;
+
+      const topDias = volumenDiario.slice(0, 10);
+      doc.autoTable({
+        startY: y,
+        head: [['Día', 'Cantidad', '% del Total']],
+        body: topDias.map(([dia, count]) => [
+          dia,
+          count.toLocaleString('es-PE'),
+          `${((count / reportes.length) * 100).toFixed(1)}%`
+        ]),
+        styles: { fontSize: 8, cellPadding: 3, valign: 'middle' },
+        headStyles: { fillColor: [240, 240, 240], textColor: [40, 40, 40], fontStyle: 'bold' },
+        columnStyles: {
+          0: { cellWidth: 50, fontStyle: 'bold' },
+          1: { cellWidth: 50, halign: 'center' },
+          2: { cellWidth: 'auto', halign: 'center' }
+        },
+        margin: { left: 14, right: 14 }
+      });
+      y = doc.lastAutoTable.finalY + 10;
+    }
+
+    // ===== SECCIÓN 5: ESTADO DE GESTIÓN =====
+    y = checkPageBreak(doc, y, 40);
+    doc.setFontSize(14); doc.setFont(undefined, 'bold'); doc.text('5. Estado de Gestión de Incidencias', 14, y); y += 8;
+
+    doc.autoTable({
+      startY: y,
+      head: [['Estado', 'Cantidad', 'Porcentaje', 'Interpretación']],
+      body: [
+        ['Nuevo (Pendiente)', estados.nuevo.toLocaleString('es-PE'), `${reportes.length > 0 ? ((estados.nuevo / reportes.length) * 100).toFixed(1) : 0}%`, 'Reportes recibidos que aún no han sido asignados ni atendidos.'],
+        ['En Proceso', estados.en_proceso.toLocaleString('es-PE'), `${reportes.length > 0 ? ((estados.en_proceso / reportes.length) * 100).toFixed(1) : 0}%`, 'Incidencias asignadas a equipos de campo en proceso de resolución.'],
+        ['Atendido', estados.atendido.toLocaleString('es-PE'), `${reportes.length > 0 ? ((estados.atendido / reportes.length) * 100).toFixed(1) : 0}%`, 'Casos resueltos satisfactoriamente durante el periodo.'],
+      ],
+      styles: { fontSize: 8, cellPadding: 3.5, valign: 'middle' },
+      headStyles: { fillColor: [8, 13, 26], textColor: [255, 255, 255], fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 38, fontStyle: 'bold' },
+        1: { cellWidth: 22, halign: 'center', textColor: [79, 143, 247], fontStyle: 'bold' },
+        2: { cellWidth: 22, halign: 'center' },
+        3: { cellWidth: 'auto' }
+      },
+      margin: { left: 14, right: 14 }
     });
+    y = doc.lastAutoTable.finalY + 10;
 
-    y += 4;
-
-    // ===== SECCIÓN 4: CONCLUSIONES Y RECOMENDACIONES =====
-    doc.setFontSize(14); doc.setFont(undefined, 'bold'); doc.text('4. Conclusiones y Recomendaciones', 14, y); y += 8;
+    // ===== SECCIÓN 6: CONCLUSIONES Y RECOMENDACIONES (DINÁMICAS) =====
+    y = checkPageBreak(doc, y, 50);
+    doc.setFontSize(14); doc.setFont(undefined, 'bold'); doc.text('6. Conclusiones y Recomendaciones', 14, y); y += 8;
     doc.setFontSize(9); doc.setFont(undefined, 'normal');
     
-    // Recomendaciones específicas
-    config.recommendations.forEach(item => {
-      doc.text(item, 14, y);
-      y += 6;
+    // Recomendaciones DINÁMICAS basadas en los datos
+    const recomendaciones = generarRecomendacionesDinamicas(config, reportes, sectorStats, ejeSummary);
+    
+    recomendaciones.forEach(item => {
+      y = checkPageBreak(doc, y, 12);
+      const splitRec = doc.splitTextToSize(item, w - 28);
+      doc.text(splitRec, 14, y);
+      y += (splitRec.length * 4.5) + 3;
     });
+
+    // ===== FIRMA / CIERRE =====
+    y = checkPageBreak(doc, y, 30);
+    y += 10;
+    doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.3); doc.line(14, y, w - 14, y); y += 8;
+    doc.setFontSize(8); doc.setTextColor(120, 120, 120);
+    doc.text('Documento generado automáticamente por el Sistema de Gestión Territorial Inteligente (SGTI v5 Premium).', 14, y);
+    y += 4;
+    doc.text(`Fecha de emisión: ${new Date().toLocaleString('es-PE')} | Periodo analizado: ${formatDate(from)} al ${formatDate(to)} | Total procesado: ${reportes.length.toLocaleString('es-PE')} registros.`, 14, y);
 
     // Footer en todas las páginas
     const pageCount = doc.internal.getNumberOfPages();

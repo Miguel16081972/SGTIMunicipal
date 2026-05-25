@@ -282,85 +282,28 @@ const whatsappGrupos = {
 };
 
 const whatsappFeeds = {
-  serenazgo: [
-    { time: 'Hace 8 min', body: 'Pelea callejera en la cuadra 5 de Jr. Los Olivos.', tags: ['Alta', 'Zona aprox.'], lat: -12.0420, lng: -77.0940, color: '#f87171', sentiment: 'negativo', category: 'Seguridad vial' },
-    { time: 'Hace 23 min', body: 'Persona sospechosa en Av. Colonial 1450. Intenta abrir vehículos.', tags: ['Media', 'Predio'], lat: -12.0445, lng: -77.0970, color: '#fbbf24', sentiment: 'negativo', category: 'Seguridad vial' },
-    { time: 'Hace 1h', body: 'Accidente menor en Av. Argentina cdra 3. Sin heridos.', tags: ['Media', 'Zona aprox.'], lat: -12.0410, lng: -77.0985, color: '#fbbf24', sentiment: 'neutral', category: 'Tránsito' },
-    { time: 'Hace 2h', body: 'Ruido excesivo en bar sin licencia, Av. Colonial 890.', tags: ['Alta', 'Predio'], lat: -12.0450, lng: -77.0945, color: '#f87171', sentiment: 'negativo', category: 'Ruido excesivo' },
-  ],
-  fiscalizacion: [
-    { time: 'Hace 1.5h', body: 'Ambulantes en Jr. Huáscar cdra 4. Retiro con acta.', tags: ['Media', 'Zona aprox.'], lat: -12.0435, lng: -77.0955, color: '#fbbf24', sentiment: 'neutral', category: 'Comercio informal' },
-    { time: 'Hace 3h', body: 'Bodega sin licencia en Calle Tacna 123.', tags: ['Alta', 'Predio'], lat: -12.0442, lng: -77.0962, color: '#f87171', sentiment: 'negativo', category: 'Comercio informal' },
-  ],
-  ambulancia: [
-    { time: 'Hace 45min', body: 'Traslado adulto mayor con dificultad respiratoria, S2.', tags: ['Alta', 'Predio'], lat: -12.0430, lng: -77.0975, color: '#f87171', sentiment: 'urgente', category: 'Emergencia médica' },
-    { time: 'Hace 2h', body: 'Niño con fiebre alta en AA.HH. Los Pinos, S4.', tags: ['Media', 'Zona aprox.'], lat: -12.0458, lng: -77.0948, color: '#fbbf24', sentiment: 'neutral', category: 'Atención médica' },
-  ],
-  rescate: [
-    { time: 'Hace 1h', body: 'Simulacro evacuación zona industrial. 45 trabajadores.', tags: ['Baja', 'Zona aprox.'], lat: -12.0415, lng: -77.0990, color: '#34d399', sentiment: 'positivo', category: 'Prevención' },
-    { time: 'Hace 5h', body: 'Muro con grietas en ribera del río, S6.', tags: ['Alta', 'Predio'], lat: -12.0465, lng: -77.0978, color: '#f87171', sentiment: 'negativo', category: 'Riesgo estructural' },
-  ],
-  limpieza: [
-    { time: 'Hace 35min', body: 'Basura acumulada Av. Colonial esq. Jr. Venezuela.', tags: ['Alta', 'Zona aprox.'], lat: -12.0438, lng: -77.0955, color: '#f87171', sentiment: 'negativo', category: 'Basura acumulada' },
-    { time: 'Hace 2h', body: 'Ruta S1 completada. Sin novedades.', tags: ['Baja', 'Zona aprox.'], lat: -12.0422, lng: -77.0935, color: '#34d399', sentiment: 'positivo', category: 'Limpieza' },
-    { time: 'Hace 3h', body: 'Desmonte en Jr. Los Olivos cdra 8.', tags: ['Media', 'Zona aprox.'], lat: -12.0428, lng: -77.0942, color: '#fbbf24', sentiment: 'negativo', category: 'Basura acumulada' },
-  ],
+  serenazgo: [],
+  fiscalizacion: [],
+  ambulancia: [],
+  rescate: [],
+  limpieza: [],
+  municipal: [],
+  ambiental: [],
+  rentas: [],
+  urbano: [],
+  riesgo: [],
+  humano: []
 };
 
-// ===== MAPA =====
 const mapaLayers = {
-  incidencias: { color: '#f87171', label: 'Incidencias', points: [
-    { lat: -12.0420, lng: -77.0940, popup: '<b>Pelea</b><br>Jr. Los Olivos' },
-    { lat: -12.0445, lng: -77.0970, popup: '<b>Sospechoso</b><br>Av. Colonial' },
-    { lat: -12.0438, lng: -77.0955, popup: '<b>Basura</b><br>Av. Colonial esq.' },
-    { lat: -12.0410, lng: -77.0985, popup: '<b>Accidente</b><br>Av. Argentina' },
-  ]},
-  negocios: { color: '#fbbf24', label: 'Negocios', points: [
-    { lat: -12.0450, lng: -77.0945, popup: 'Pollería "El Sabrosón" ✅' },
-    { lat: -12.0435, lng: -77.0960, popup: 'Bar "La Noche" ❌' },
-    { lat: -12.0425, lng: -77.0930, popup: 'Taller "AutoFix" ⚠️' },
-  ]},
-  obras: { color: '#fb923c', label: 'Obras', points: [
-    { lat: -12.0460, lng: -77.0975, popup: 'Pistas 75%' },
-    { lat: -12.0432, lng: -77.0950, popup: 'Parque 45%' },
-  ]},
-  riesgo: { color: '#f87171', label: 'Riesgo', points: [
-    { lat: -12.0465, lng: -77.0978, popup: 'Ribera 🔴' },
-    { lat: -12.0418, lng: -77.0988, popup: 'Industrial 🟡' },
-    { lat: -12.0442, lng: -77.0948, popup: 'Mercado 🟡' },
-  ]},
-  semaforo: { color: '#34d399', label: 'Semáforo', points: [
-    { lat: -12.0422, lng: -77.0940, popup: 'S1 🟡', color: '#fbbf24', radius: 20 },
-    { lat: -12.0430, lng: -77.0975, popup: 'S2 🟢', color: '#34d399', radius: 14 },
-    { lat: -12.0445, lng: -77.0955, popup: 'S3 🔴', color: '#f87171', radius: 28 },
-    { lat: -12.0455, lng: -77.0940, popup: 'S4 🟡', color: '#fbbf24', radius: 18 },
-    { lat: -12.0415, lng: -77.0985, popup: 'S5 🟢', color: '#34d399', radius: 15 },
-    { lat: -12.0460, lng: -77.0970, popup: 'S6 🟡', color: '#fbbf24', radius: 16 },
-  ]},
+  incidencias: { color: '#f87171', label: 'Incidencias', points: [] },
+  negocios: { color: '#fbbf24', label: 'Negocios', points: [] },
+  obras: { color: '#fb923c', label: 'Obras', points: [] },
+  riesgo: { color: '#f87171', label: 'Riesgo', points: [] },
+  semaforo: { color: '#34d399', label: 'Semáforo', points: [] },
 };
 
-// ===== REPORTES WHATSAPP =====
-// Cada reporte recibido por WhatsApp queda registrado con estado y trazabilidad
-const whatsappReportes = [
-  { id: 'RPT-001', fecha: '2026-04-06T10:52:00', grupo: 'seguridad', reportadoPor: 'Patrulla S3-B', telefono: '+51987654321', mensaje: 'Pelea callejera en la cuadra 5 de Jr. Los Olivos.', categoria: 'Seguridad vial', prioridad: 'Alta', sector: 'Sector 3', ubicacion: 'Jr. Los Olivos cdra 5', lat: -12.0420, lng: -77.0940, estado: 'nuevo', asignadoA: null, notas: '', fotoUrl: null },
-  { id: 'RPT-002', fecha: '2026-04-06T10:37:00', grupo: 'seguridad', reportadoPor: 'Patrulla S1-A', telefono: '+51976543210', mensaje: 'Persona sospechosa en Av. Colonial 1450. Intenta abrir vehículos.', categoria: 'Seguridad vial', prioridad: 'Media', sector: 'Sector 1', ubicacion: 'Av. Colonial 1450', lat: -12.0445, lng: -77.0970, estado: 'en_proceso', asignadoA: 'Serenazgo Turno B', notas: 'Patrulla en camino', fotoUrl: null },
-  { id: 'RPT-003', fecha: '2026-04-06T09:55:00', grupo: 'seguridad', reportadoPor: 'Vecino Anónimo', telefono: '+51965432100', mensaje: 'Accidente menor en Av. Argentina cdra 3. Sin heridos.', categoria: 'Tránsito', prioridad: 'Media', sector: 'Sector 5', ubicacion: 'Av. Argentina cdra 3', lat: -12.0410, lng: -77.0985, estado: 'atendido', asignadoA: 'Tránsito Municipal', notas: 'Se levantó acta. Sin heridos.', fotoUrl: null },
-  { id: 'RPT-004', fecha: '2026-04-06T08:55:00', grupo: 'seguridad', reportadoPor: 'Junta Vecinal S3', telefono: '+51954321000', mensaje: 'Ruido excesivo en bar sin licencia, Av. Colonial 890.', categoria: 'Ruido excesivo', prioridad: 'Alta', sector: 'Sector 3', ubicacion: 'Av. Colonial 890', lat: -12.0450, lng: -77.0945, estado: 'en_proceso', asignadoA: 'Fiscalización', notas: 'Se coordina operativo nocturno', fotoUrl: null },
-  { id: 'RPT-005', fecha: '2026-04-06T09:25:00', grupo: 'seguridad', reportadoPor: 'Inspector R. López', telefono: '+51943210000', mensaje: 'Ambulantes en Jr. Huáscar cdra 4. Retiro con acta.', categoria: 'Comercio informal', prioridad: 'Media', sector: 'Sector 4', ubicacion: 'Jr. Huáscar cdra 4', lat: -12.0435, lng: -77.0955, estado: 'atendido', asignadoA: 'Fiscalización Turno A', notas: 'Se retiraron 6 ambulantes con acta.', fotoUrl: null },
-  { id: 'RPT-006', fecha: '2026-04-06T07:55:00', grupo: 'seguridad', reportadoPor: 'Vecino J. Pérez', telefono: '+51932100000', mensaje: 'Bodega sin licencia en Calle Tacna 123.', categoria: 'Comercio informal', prioridad: 'Alta', sector: 'Sector 2', ubicacion: 'Calle Tacna 123', lat: -12.0442, lng: -77.0962, estado: 'nuevo', asignadoA: null, notas: '', fotoUrl: null },
-  { id: 'RPT-007', fecha: '2026-04-06T10:15:00', grupo: 'seguridad', reportadoPor: 'Paramédico C. Vega', telefono: '+51921000000', mensaje: 'Traslado adulto mayor con dificultad respiratoria, S2.', categoria: 'Emergencia médica', prioridad: 'Alta', sector: 'Sector 2', ubicacion: 'AA.HH. San Martín', lat: -12.0430, lng: -77.0975, estado: 'atendido', asignadoA: 'Ambulancia 01', notas: 'Traslado completado a Hospital Carrión.', fotoUrl: null },
-  { id: 'RPT-008', fecha: '2026-04-06T08:55:00', grupo: 'seguridad', reportadoPor: 'Centro Salud CLR', telefono: '+51910000000', mensaje: 'Niño con fiebre alta en AA.HH. Los Pinos, S4.', categoria: 'Atención médica', prioridad: 'Media', sector: 'Sector 4', ubicacion: 'AA.HH. Los Pinos', lat: -12.0458, lng: -77.0948, estado: 'en_proceso', asignadoA: 'Ambulancia 02', notas: 'En camino', fotoUrl: null },
-  { id: 'RPT-009', fecha: '2026-04-06T09:55:00', grupo: 'municipal', reportadoPor: 'Defensa Civil', telefono: '+51909000000', mensaje: 'Simulacro evacuación zona industrial. 45 trabajadores.', categoria: 'Prevención', prioridad: 'Baja', sector: 'Sector 5', ubicacion: 'Zona Industrial', lat: -12.0415, lng: -77.0990, estado: 'atendido', asignadoA: 'Defensa Civil', notas: 'Simulacro exitoso. 45 evacuados en 4 min.', fotoUrl: null },
-  { id: 'RPT-010', fecha: '2026-04-06T05:55:00', grupo: 'municipal', reportadoPor: 'Vecino M. Torres', telefono: '+51908000000', mensaje: 'Muro con grietas en ribera del río, S6.', categoria: 'Riesgo estructural', prioridad: 'Alta', sector: 'Sector 6', ubicacion: 'Ribera del Río, S6', lat: -12.0465, lng: -77.0978, estado: 'en_proceso', asignadoA: 'Ing. Estructura', notas: 'Evaluación programada para hoy PM.', fotoUrl: null },
-  { id: 'RPT-011', fecha: '2026-04-06T10:25:00', grupo: 'ambiental', reportadoPor: 'Vecina L. Chávez', telefono: '+51907000000', mensaje: 'Basura acumulada Av. Colonial esq. Jr. Venezuela.', categoria: 'Basura acumulada', prioridad: 'Alta', sector: 'Sector 3', ubicacion: 'Av. Colonial esq. Jr. Venezuela', lat: -12.0438, lng: -77.0955, estado: 'nuevo', asignadoA: null, notas: '', fotoUrl: null },
-  { id: 'RPT-012', fecha: '2026-04-06T08:55:00', grupo: 'ambiental', reportadoPor: 'Operador Ruta S1', telefono: '+51906000000', mensaje: 'Ruta S1 completada. Sin novedades.', categoria: 'Limpieza', prioridad: 'Baja', sector: 'Sector 1', ubicacion: 'Ruta S1 completa', lat: -12.0422, lng: -77.0935, estado: 'atendido', asignadoA: 'Limpieza Ruta S1', notas: 'Ruta completada a las 08:50.', fotoUrl: null },
-  { id: 'RPT-013', fecha: '2026-04-06T07:55:00', grupo: 'ambiental', reportadoPor: 'Junta Vecinal S1', telefono: '+51905000000', mensaje: 'Desmonte en Jr. Los Olivos cdra 8.', categoria: 'Basura acumulada', prioridad: 'Media', sector: 'Sector 1', ubicacion: 'Jr. Los Olivos cdra 8', lat: -12.0428, lng: -77.0942, estado: 'en_proceso', asignadoA: 'Limpieza Especial', notas: 'Volquete programado para mañana.', fotoUrl: null },
-  // --- NUEVOS REPORTES POR ÁREA ---
-  { id: 'RPT-014', fecha: '2026-04-06T11:00:00', grupo: 'rentas', reportadoPor: 'Fiscalizador Tributario', telefono: '+51904000000', mensaje: 'Local "Taller Rápido" operando sin licencia de funcionamiento.', categoria: 'Gestión de Rentas', prioridad: 'Alta', sector: 'Sector 4', ubicacion: 'Jr. Huáscar 456', lat: -12.0435, lng: -77.0955, estado: 'nuevo', asignadoA: 'Fisc. Tributaria', notas: 'Se requiere clausura preventiva.', fotoUrl: null },
-  { id: 'RPT-015', fecha: '2026-04-06T12:00:00', grupo: 'urbano', reportadoPor: 'Inspector de Obras', telefono: '+51903000000', mensaje: 'Pista dañada por filtración en Av. Venezuela cdra 3.', categoria: 'Pista/Vereda Dañada', prioridad: 'Media', sector: 'Sector 2', ubicacion: 'Av. Venezuela 345', lat: -12.0448, lng: -77.0970, estado: 'en_proceso', asignadoA: 'Obras Públicas', notas: 'Mantenimiento programado.', fotoUrl: null },
-  { id: 'RPT-016', fecha: '2026-04-06T13:00:00', grupo: 'humano', reportadoPor: 'Promotor Social', telefono: '+51902000000', mensaje: 'Campaña Jueves de Patitas completada con éxito. 45 mascotas atendidas.', categoria: 'Bienestar Animal (Patitas)', prioridad: 'Baja', sector: 'Sector 3', ubicacion: 'Losa Deportiva Sector 3', lat: -12.0440, lng: -77.0960, estado: 'atendido', asignadoA: 'Salud y Sanidad', notas: 'Excedió meta de 40 mascotas.', fotoUrl: null },
-  { id: 'RPT-017', fecha: '2026-04-06T14:30:00', grupo: 'urbano', reportadoPor: 'Vecino Vigilante', telefono: '+51901000000', mensaje: 'Pintado de postes y mantenimiento de áreas verdes en Plaza Grau.', categoria: 'Ornato y Mantenimiento', prioridad: 'Baja', sector: 'Sector 1', ubicacion: 'Plaza Grau', lat: -12.0418, lng: -77.0935, estado: 'atendido', asignadoA: 'Ornato y Parques', notas: 'Trabajos de embellecimiento concluidos.', fotoUrl: null },
-];
+const whatsappReportes = [];
 
 module.exports = {
   overviewKPIs, semaforo, alertas, gerencias, notificaciones,

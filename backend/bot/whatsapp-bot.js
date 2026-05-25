@@ -10,6 +10,7 @@ const { geocodeAddress } = require('./geocoder');
 let client;
 let currentQR = null;
 let isAuthenticated = false;
+let isInitializing = false;
 let connectedGroups = []; // Grupos reales detectados
 let lastLog = 'Esperando inicio de sistema...';
 
@@ -57,6 +58,26 @@ async function saveReport(reporte) {
   const Model = getModel();
   if (Model) {
     try {
+      // === Buscar supervisor de turno automáticamente ===
+      let supervisorAsignado = null;
+      try {
+        const Models = require('../database/models');
+        if (Models.Configuracion) {
+          const hora = new Date(reporte.fecha || new Date()).getHours();
+          let claveTurno = 'supervisor_noche'; // 22:00 - 06:00
+          if (hora >= 6 && hora < 14) claveTurno = 'supervisor_manana';
+          else if (hora >= 14 && hora < 22) claveTurno = 'supervisor_tarde';
+
+          const config = await Models.Configuracion.findOne({ where: { clave: claveTurno } });
+          if (config && config.valor) {
+            supervisorAsignado = config.valor;
+            console.log(`✅ [Bot] Supervisor de turno asignado: ${config.valor} (${claveTurno})`);
+          }
+        }
+      } catch (supErr) {
+        console.warn('⚠️ [Bot] No se pudo asignar supervisor de turno:', supErr.message);
+      }
+
       await Model.create({
         idString: reporte.id,
         fecha: reporte.fecha,
@@ -78,8 +99,9 @@ async function saveReport(reporte) {
         fotoUrl: reporte.fotoUrl,
         areasDerivadas: JSON.stringify(reporte.areasDerivadas),
         esDerivacionMultiple: reporte.esDerivacionMultiple,
+        supervisor: supervisorAsignado
       });
-      console.log(`💾 Reporte ${reporte.id} guardado en BD MySQL`);
+      console.log(`💾 Reporte ${reporte.id} guardado en BD MySQL con supervisor: ${supervisorAsignado}`);
       return true;
     } catch (err) {
       console.error(`❌ Error guardando en BD: ${err.message}. Guardando en memoria.`);
@@ -105,40 +127,32 @@ const initWhatsAppBot = () => {
 
   // Detectar OS para Chrome path
   const isWindows = process.platform === 'win32';
-  
+
   // Intentar detectar ruta de Chrome en Linux (común en Hostinger/VPS)
   const puppeteerConfig = isWindows
     ? { args: ['--no-sandbox', '--disable-setuid-sandbox'] }
     : {
-        executablePath: require('fs').existsSync('/usr/bin/google-chrome-stable') 
-          ? '/usr/bin/google-chrome-stable' 
-          : (require('fs').existsSync('/usr/bin/chromium-browser') ? '/usr/bin/chromium-browser' : undefined),
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
-      };
+      executablePath: require('fs').existsSync('/usr/bin/google-chrome-stable')
+        ? '/usr/bin/google-chrome-stable'
+        : (require('fs').existsSync('/usr/bin/chromium-browser') ? '/usr/bin/chromium-browser' : undefined),
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+    };
 
   lastLog = 'Iniciando Navegador (Puppeteer)...';
   console.log('  ⏳ ' + lastLog);
-  
+
   client = new Client({
     authStrategy: new LocalAuth({ dataPath: './bot-session' }),
-    webVersion: '2.2412.54',
-    webVersionCache: {
-      type: 'remote',
-      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/{version}.html',
-    },
+    // webVersion: '2.3000.1012170016', // Versión más estable o dejar por defecto
     puppeteer: {
-      ...puppeteerConfig,
+      executablePath: '/usr/bin/google-chrome-stable',
       headless: true,
-      handleSIGINT: false, // Evita cierres accidentales
       args: [
-        ...(puppeteerConfig.args || []),
-        '--disable-gpu',
+        '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
       ],
+      authTimeoutMs: 60000, // 60 segundos de margen
     },
   });
 
@@ -165,11 +179,13 @@ const initWhatsAppBot = () => {
   client.on('authenticated', () => {
     lastLog = 'Autenticado. Cargando chats...';
     console.log('  ✅ [AUTH] Sesión autenticada correctamente');
+    isInitializing = false;
   });
 
   client.on('auth_failure', msg => {
     lastLog = 'Error de autenticación: ' + msg;
     console.error('  ❌ [AUTH] Fallo de autenticación:', msg);
+    isInitializing = false;
   });
 
   client.on('ready', async () => {
@@ -196,7 +212,7 @@ const initWhatsAppBot = () => {
         for (const g of groups) {
           const remoteId = g.id._serialized;
           const manual = manualMap[remoteId];
-          
+
           let areaId = null;
           let isMonitored = false;
 
@@ -286,15 +302,15 @@ const initWhatsAppBot = () => {
       // Registrar solo grupos vinculados y monitoreados
       const remoteId = chat.id._serialized;
       const monitored = isMonitoredGroup(chatName, remoteId);
-      
+
       if (chat.isGroup && !monitored) {
         console.log(`ℹ️ Mensaje ignorado (Grupo no activo): [${chatName}] - ID: ${remoteId}`);
-        return; 
+        return;
       }
 
-      // Ignorar estados y mensajes de solo media sin texto
+      // Ignorar estados y mensajes de solo media sin texto (Corregido para permitir fotos)
       if (msg.isStatus) return;
-      if (!msg.body && msg.type !== 'location') return;
+      if (!msg.body && msg.type !== 'location' && !msg.hasMedia) return;
 
       console.log(`📩 [${chatName}]: ${msg.body?.substring(0, 80) || '(ubicación)'}...`);
 
@@ -320,7 +336,29 @@ const initWhatsAppBot = () => {
         }
       }
 
-      // 3. CREAR REPORTE
+      // 3. CAPTURAR MULTIMEDIA (FOTOS) - Con timeout y manejo de error para no perder el reporte
+      let fotoUrl = null;
+      if (msg.hasMedia) {
+        try {
+          console.log(`📸 Descargando multimedia para [${chatName}]...`);
+          // Timeout de 15 segundos para la descarga
+          const mediaPromise = msg.downloadMedia();
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout descarga')), 15000)
+          );
+          
+          const media = await Promise.race([mediaPromise, timeoutPromise]);
+          
+          if (media && media.mimetype.startsWith('image/')) {
+            fotoUrl = `data:${media.mimetype};base64,${media.data}`;
+            console.log(`✅ Foto procesada con éxito`);
+          }
+        } catch (e) {
+          console.error(`⚠️ Error multimedia (${chatName}): ${e.message}. Se guardará el reporte sin foto.`);
+        }
+      }
+
+      // 4. CREAR REPORTE
       const reportId = await getNextReportId();
       const nuevoReporte = {
         id: reportId,
@@ -329,7 +367,7 @@ const initWhatsAppBot = () => {
         grupoWhatsapp: chatName,
         reportadoPor: msg._data?.notifyName || msg.from?.split('@')[0] || 'Desconocido',
         telefono: msg.from?.split('@')[0] || '',
-        mensaje: msg.body || '(Ubicación compartida)',
+        mensaje: msg.body || (msg.type === 'location' ? '(Ubicación compartida)' : '(Imagen)'),
         categoria: analysis.categoria,
         prioridad: analysis.prioridad,
         sector: analysis.sector,
@@ -342,13 +380,37 @@ const initWhatsAppBot = () => {
         notas: chat.isGroup
           ? `Grupo: ${chatName} | Áreas: ${analysis.areasDerivadas.join(', ')}`
           : 'Mensaje directo',
-        fotoUrl: null,
+        fotoUrl: fotoUrl, // Ya no es null
         areasDerivadas: analysis.areasDerivadas,
         esDerivacionMultiple: analysis.esDerivacionMultiple,
       };
 
-      // 4. GUARDAR
+      // 5. GUARDAR Y SINCRONIZAR FEED EN VIVO
       await saveReport(nuevoReporte);
+
+      // Inyectar en el feed de memoria para que el dashboard lo vea en tiempo real
+      const { whatsappFeeds } = require('../data/mock-data');
+      if (whatsappFeeds[nuevoReporte.grupo]) {
+        whatsappFeeds[nuevoReporte.grupo].unshift({
+          id: nuevoReporte.id,
+          time: 'Ahora',
+          fecha: nuevoReporte.fecha,
+          sender: nuevoReporte.reportadoPor,
+          body: nuevoReporte.mensaje,
+          tags: [nuevoReporte.prioridad, 'WSP'],
+          color: nuevoReporte.prioridad === 'Alta' ? '#f87171' : '#fbbf24',
+          category: nuevoReporte.categoria,
+          lat: nuevoReporte.lat,
+          lng: nuevoReporte.lng,
+          ubicacion: nuevoReporte.ubicacion,
+          fotoUrl: nuevoReporte.fotoUrl,
+          sentiment: analysis.sentiment || 'neutral'
+        });
+        // Mantener el feed manejable (máx 50 mensajes en memoria)
+        if (whatsappFeeds[nuevoReporte.grupo].length > 50) {
+          whatsappFeeds[nuevoReporte.grupo].pop();
+        }
+      }
 
       // Log de derivación
       if (analysis.esDerivacionMultiple) {
@@ -367,22 +429,25 @@ const initWhatsAppBot = () => {
     connectedGroups = [];
   });
 
+  isInitializing = true;
   client.initialize().catch(err => {
     console.error('Error inicializando WhatsApp:', err.message);
+    isInitializing = false;
   });
 
   // SISTEMA DE VIGILANCIA (Keep-Alive)
-  // Cada 5 minutos verificamos si el bot sigue vivo
   setInterval(async () => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated && !isInitializing) {
       console.log('🔄 [VIGILANCIA] Bot detectado como desconectado. Intentando re-inicializar...');
       try {
+        isInitializing = true;
         await client.initialize();
       } catch (e) {
         console.error('❌ [VIGILANCIA] Fallo al re-inicializar:', e.message);
+        isInitializing = false;
       }
     }
-  }, 1000 * 60 * 5); 
+  }, 1000 * 60 * 5);
 };
 
 /**

@@ -14,3 +14,18 @@ backend/bot-session/
 *.db
 *.sqlite
 session/
+
+# Comprimidos
+*.zip
+*.rar
+*.7z
+
+# Temporales / pruebas
+backend/scratch/
+build_error.txt
+*.log
+
+# Variables de entorno
+.env
+.env.*
+!.env.example

@@ -11,9 +11,13 @@ function isDbConnected() {
   try { return require('../database/db').isConnected(); } catch (e) { return false; }
 }
 
-// GET /api/mapa/layers — Capas estáticas del mapa
+// GET /api/mapa/layers — Capas estáticas del mapa (Limpio de datos falsos)
 router.get('/layers', (req, res) => {
-  res.json(mapaLayers);
+  const cleanLayers = {};
+  for (const key in mapaLayers) {
+    cleanLayers[key] = { ...mapaLayers[key], points: [] };
+  }
+  res.json(cleanLayers);
 });
 
 // GET /api/mapa/reportes — Reportes geocodificados para el mapa
@@ -42,7 +46,7 @@ router.get('/reportes', async (req, res) => {
       const mensajes = await Model.findAll({
         where: whereOpts,
         order: [['fecha', 'DESC']],
-        limit: 100,
+        limit: 1000,
       });
 
       const points = mensajes.map(m => {
@@ -67,9 +71,9 @@ router.get('/reportes', async (req, res) => {
     }
   }
 
-  // Fallback: usar mock data + memoria
+  // Fallback: usar SOLO memoria del bot activo (sin datos falsos)
   const { getMemoryReportes } = require('../bot/whatsapp-bot');
-  let allReportes = [...getMemoryReportes(), ...whatsappReportes];
+  let allReportes = [...getMemoryReportes()];
   
   if (req.user && req.user.gerencia !== 'all') {
     const uGerencia = req.user.gerencia;

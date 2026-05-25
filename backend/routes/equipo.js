@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { Usuario } = require('../database/models');
+const { Usuario, MensajeWhatsapp } = require('../database/models');
 const bcrypt = require('bcryptjs');
+const { Op } = require('sequelize');
 
 // Middleware para verificar si es gerente o admin
 const checkManager = (req, res, next) => {
@@ -18,11 +19,9 @@ router.get('/personal', async (req, res) => {
     const whereClause = {};
     
     if (req.user.rol === 'admin') {
-      // El admin solo ve a los gerentes
       whereClause.rol = 'gerente';
     } else {
-      // El gerente solo ve a sus operadores
-      whereClause.rol = 'operador';
+      whereClause.rol = { [Op.in]: ['operador', 'visor'] };
       
       const subAreas = {
         seguridad: ['seguridad', 'serenazgo', 'fiscalizacion', 'transporte'],
@@ -39,15 +38,54 @@ router.get('/personal', async (req, res) => {
 
     const personal = await Usuario.findAll({
       where: whereClause,
-      attributes: ['id', 'username', 'nombre', 'gerencia', 'createdAt'],
+      attributes: ['id', 'username', 'nombre', 'gerencia', 'rol', 'createdAt'],
       order: [['createdAt', 'DESC']]
     });
 
-    res.json(personal);
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    const personalConConteo = await Promise.all(personal.map(async (u) => {
+      const data = u.toJSON();
+      if (MensajeWhatsapp) {
+        data.reportesHoy = await MensajeWhatsapp.count({
+          where: {
+            reportadoPor: u.nombre,
+            fecha: { [Op.gte]: hoy }
+          }
+        });
+      } else {
+        data.reportesHoy = 0;
+      }
+      return data;
+    }));
+
+    res.json(personalConConteo);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
+// GET /api/equipo/personal/:id/reportes — Obtiene los reportes de un usuario
+router.get('/personal/:id/reportes', async (req, res) => {
+  try {
+    const usuario = await Usuario.findByPk(req.params.id);
+    if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    if (!MensajeWhatsapp) return res.json([]);
+
+    const reportes = await MensajeWhatsapp.findAll({
+      where: { reportadoPor: usuario.nombre },
+      order: [['fecha', 'DESC']],
+      limit: 50
+    });
+
+    res.json(reportes);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // POST /api/equipo/personal — Crea un nuevo usuario operador
 router.post('/personal', async (req, res) => {
@@ -73,9 +111,14 @@ router.post('/personal', async (req, res) => {
       targetGerencia = req.body.gerencia || 'municipal';
     } else {
       // Si es gerente, puede asignar una sub-gerencia de su competencia
-      targetRol = 'operador';
-      // Usamos la gerencia enviada (ej: serenazgo) o la del usuario por defecto
-      targetGerencia = req.body.gerencia || req.user.gerencia;
+      targetRol = (req.body.rol === 'visor') ? 'visor' : 'operador';
+      
+      const subAreasSeguridad = ['serenazgo', 'fiscalizacion', 'transporte'];
+      if (req.user.gerencia === 'seguridad' && subAreasSeguridad.includes(req.body.gerencia)) {
+         targetGerencia = req.body.gerencia;
+      } else {
+         targetGerencia = req.user.gerencia;
+      }
     }
 
     const nuevo = await Usuario.create({
@@ -119,6 +162,54 @@ router.delete('/personal/:id', async (req, res) => {
 
     await user.destroy();
     res.json({ message: 'Usuario eliminado correctamente' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ========================================
+// SUPERVISORES POR TURNO
+// ========================================
+const { Configuracion } = require('../database/models');
+
+// GET /api/equipo/supervisores-turno — Obtener configuración actual
+router.get('/supervisores-turno', async (req, res) => {
+  try {
+    const configs = await Configuracion.findAll({
+      where: { clave: ['supervisor_manana', 'supervisor_tarde', 'supervisor_noche'] }
+    });
+    const result = {
+      supervisor_manana: '',
+      supervisor_tarde: '',
+      supervisor_noche: ''
+    };
+    configs.forEach(c => { result[c.clave] = c.valor || ''; });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/equipo/supervisores-turno — Guardar configuración de supervisores
+router.post('/supervisores-turno', async (req, res) => {
+  const { supervisor_manana, supervisor_tarde, supervisor_noche } = req.body;
+  
+  try {
+    const turnos = [
+      { clave: 'supervisor_manana', valor: supervisor_manana || '' },
+      { clave: 'supervisor_tarde', valor: supervisor_tarde || '' },
+      { clave: 'supervisor_noche', valor: supervisor_noche || '' }
+    ];
+
+    for (const t of turnos) {
+      await Configuracion.upsert({
+        clave: t.clave,
+        valor: t.valor,
+        gerencia: req.user.gerencia || 'seguridad'
+      });
+    }
+
+    res.json({ message: 'Supervisores de turno actualizados con éxito' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

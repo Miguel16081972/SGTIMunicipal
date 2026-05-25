@@ -61,7 +61,8 @@ export async function exportCurrentTable() {
          grupo: document.getElementById('rpt-filtro-grupo')?.value || 'todos',
          prioridad: document.getElementById('rpt-filtro-prioridad')?.value || 'todas',
          from: document.getElementById('filter-from')?.value,
-         to: document.getElementById('filter-to')?.value
+         to: document.getElementById('filter-to')?.value,
+         limit: 'all'
       };
       
       const { reportes } = await api.getWhatsappReportes(filters);
@@ -70,21 +71,63 @@ export async function exportCurrentTable() {
         alert('No hay datos para exportar con los filtros actuales.');
         return;
       }
+
+      // Cargar la configuración actual de supervisores por turno
+      let configTurnos = { supervisor_manana: '', supervisor_tarde: '', supervisor_noche: '' };
+      try {
+        configTurnos = await api.getSupervisoresTurno();
+      } catch (err) {
+        console.warn('⚠️ No se pudo obtener la configuración de turnos para el Excel:', err);
+      }
       
       // Formatear data para Excel
-      const dataForExcel = reportes.map(r => ({
-        ID: r.id,
-        Fecha: new Date(r.fecha).toLocaleString('es-PE'),
-        Grupo: r.grupo,
-        Categoría: r.categoria,
-        Mensaje: r.mensaje,
-        Prioridad: r.prioridad,
-        Estado: r.estado,
-        Sector: r.sector,
-        Ubicación: r.ubicacion,
-        ReportadoPor: r.reportadoPor,
-        Teléfono: r.telefono || ''
-      }));
+      const dataForExcel = reportes.map(r => {
+        const d = new Date(r.fecha);
+        const dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+        const diaStr = dias[d.getDay()];
+        const horas = d.getHours();
+        const mins = d.getMinutes().toString().padStart(2, '0');
+        const horaStr = `${horas.toString().padStart(2, '0')}:${mins}`;
+        
+        // Calcular TURNO y obtener la clave del supervisor configurado
+        let turnoStr = 'MAÑANA A';
+        let keyTurno = 'supervisor_noche';
+        if (horas >= 6 && horas < 14) {
+          turnoStr = 'MAÑANA A';
+          keyTurno = 'supervisor_manana';
+        } else if (horas >= 14 && horas < 22) {
+          turnoStr = 'TARDE B';
+          keyTurno = 'supervisor_tarde';
+        } else {
+          turnoStr = 'NOCHE C';
+          keyTurno = 'supervisor_noche';
+        }
+
+        const supervisorNombre = r.supervisor || configTurnos[keyTurno] || '';
+ 
+        return {
+          'FECHA': d.toLocaleDateString('es-PE'),
+          'DIA': diaStr.toUpperCase(),
+          'HORA': horaStr,
+          'TURNO': turnoStr,
+          'ZONA': (r.sector || '').toUpperCase(),
+          'DIRECCIÓN': (r.ubicacion || '').toUpperCase(),
+          'TITULO': (r.categoria || '').toUpperCase(),
+          'NOVEDAD': r.mensaje || '',
+          'FILTRO': (r.grupo || '').toUpperCase(),
+          'TIPO': '',
+          'SUBTIPO': '',
+          'FUENTE DE INFORMACION': (r.fuente || 'APP MÓVIL').toUpperCase(),
+          'SUPERVISOR DE CAMPO': supervisorNombre.toUpperCase(),
+          'RESPONSABLE': '',
+          'SERENO/QUINTERVINO': (r.reportadoPor || '').toUpperCase(),
+          'ENCARGADA DE CECOM': '',
+          'OPERADOR': '',
+          'RADIO': '',
+          'CAMARA': '',
+          'INTERVENCIÓN': (r.estado || 'NUEVO').toUpperCase()
+        };
+      });
       
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(dataForExcel);

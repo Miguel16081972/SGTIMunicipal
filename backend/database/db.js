@@ -41,8 +41,8 @@ class Database {
       const Models = require('./models');
       
       // Sincroniza la estructura de la tabla (Método seguro)
-      await this.sequelize.sync({ alter: true });
-      console.log('✅ Estructura de base de datos actualizada.');
+      await this.sequelize.sync({ alter: false });
+      console.log('✅ Estructura de base de datos confirmada.');
       
       // --- SEEDING INICIAL DE USUARIOS ---
       const usuariosSeed = [

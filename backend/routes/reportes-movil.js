@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { MensajeWhatsapp } = require('../database/models');
+const { MensajeWhatsapp, Configuracion } = require('../database/models');
 const database = require('../database/db');
 const { whatsappFeeds, whatsappReportes } = require('../data/mock-data');
 
@@ -17,8 +17,12 @@ router.post('/', async (req, res) => {
   const id = 'MOB-' + String(Date.now()).slice(-6);
 
   const jwt = require('jsonwebtoken');
-  const JWT_SECRET = process.env.JWT_SECRET || 'sgti_secret_key';
+  // Forzar carga de secreto desde el entorno para evitar desajustes
+  const JWT_SECRET = process.env.JWT_SECRET || 'sgti_carmen_legua_secret_key_2026'; 
   let currentUser = null;
+
+  // LOG DE ENTRADA PARA DEPURACIÓN
+  console.log('--- NUEVO REPORTE MÓVIL RECIBIDO ---');
 
   // Intentar obtener usuario si hay token (auth opcional para reportes móviles)
   const authHeader = req.headers['authorization'];
@@ -26,19 +30,26 @@ router.post('/', async (req, res) => {
     try {
       const token = authHeader.split(' ')[1];
       currentUser = jwt.verify(token, JWT_SECRET);
+      console.log(`✅ Token verificado. Usuario: ${currentUser.nombre} (${currentUser.username})`);
     } catch (e) {
-      console.warn('Token inválido en reporte móvil, procediendo como anónimo');
+      console.warn(`❌ Error verificando token: ${e.message}`);
+      console.log(`🔍 Secreto usado: ${JWT_SECRET.substring(0, 5)}...`);
     }
+  } else {
+    console.log('⚠️ No se recibió cabecera de Authorization (Bearer token)');
   }
 
   // Mapeo de categorías a grupos principales
   const categoriaAMapa = {
     'Seguridad': 'seguridad',
-    'Limpieza': 'ambiental',
-    'Obras': 'urbano',
     'Fiscalización': 'seguridad',
-    'Tránsito': 'seguridad',
-    'Riesgos': 'riesgo',
+    'Fiscalizacion': 'seguridad',
+    'Serenazgo': 'seguridad',
+    'Limpieza': 'ambiental',
+    'Parques': 'ambiental',
+    'Obras': 'urbano',
+    'Vías': 'urbano',
+    'Rentas': 'rentas',
     'Otros': 'seguridad'
   };
 
@@ -67,7 +78,16 @@ router.post('/', async (req, res) => {
 
   const { fotoUrl } = req.body;
   if (fotoUrl) {
-    console.log(`📸 Foto recibida [${id}]. Longitud: ${fotoUrl.length} caracteres.`);
+    console.log(`📸 [DEBUG MÓVIL] Foto recibida para [${id}].`);
+    console.log(`📸 [DEBUG MÓVIL] Comienzo: ${fotoUrl.substring(0, 100)}`);
+    console.log(`📸 [DEBUG MÓVIL] Longitud total: ${fotoUrl.length}`);
+  } else {
+    console.log(`⚠️ [DEBUG MÓVIL] No se recibió fotoUrl para [${id}]`);
+  }
+
+  const areasDerivadasGuardar = [grupoPrincipal];
+  if (userGerencia && userGerencia !== grupoPrincipal) {
+      areasDerivadasGuardar.push(userGerencia);
   }
 
   const nuevoReporte = {
@@ -85,33 +105,55 @@ router.post('/', async (req, res) => {
     lng: parseFloat(lng),
     estado: estado || 'nuevo',
     fotoUrl: fotoUrl || null,
-    areasDerivadas: JSON.stringify([grupoPrincipal]),
-    esDerivacionMultiple: false
+    areasDerivadas: JSON.stringify(areasDerivadasGuardar),
+    esDerivacionMultiple: false,
+    supervisor: null  // se llenará abajo con el supervisor de turno
   };
+
+  // === Buscar supervisor de turno automáticamente ===
+  try {
+    const hora = new Date().getHours();
+    let claveTurno = 'supervisor_noche'; // 22:00 - 06:00
+    if (hora >= 6 && hora < 14) claveTurno = 'supervisor_manana';
+    else if (hora >= 14 && hora < 22) claveTurno = 'supervisor_tarde';
+
+    if (Configuracion) {
+      const config = await Configuracion.findOne({ where: { clave: claveTurno } });
+      if (config && config.valor) {
+        nuevoReporte.supervisor = config.valor;
+        console.log(`\u2705 Supervisor de turno asignado: ${config.valor} (${claveTurno})`);
+      }
+    }
+  } catch (supErr) {
+    console.warn('\u26a0\ufe0f No se pudo asignar supervisor de turno:', supErr.message);
+  }
 
 
   try {
-    if (MensajeWhatsapp && database.isConnected()) {
+    // Sincronizar con el Feed en vivo (Memoria)
+    if (whatsappFeeds[nuevoReporte.grupo]) {
+      whatsappFeeds[nuevoReporte.grupo].unshift({
+        id: id,
+        time: 'Ahora',
+        fecha: nuevoReporte.fecha,
+        sender: nuevoReporte.reportadoPor,
+        body: nuevoReporte.mensaje,
+        tags: [nuevoReporte.prioridad, 'Móvil'],
+        color: nuevoReporte.prioridad === 'Alta' ? '#f87171' : '#fbbf24',
+        category: nuevoReporte.categoria,
+        estado: nuevoReporte.estado,
+        lat: nuevoReporte.lat,
+        lng: nuevoReporte.lng,
+        ubicacion: nuevoReporte.ubicacion,
+        fotoUrl: nuevoReporte.fotoUrl
+      });
+    }
+
+    if (MensajeWhatsapp) {
       const reporte = await MensajeWhatsapp.create(nuevoReporte);
       return res.status(201).json({ message: 'Reporte enviado con éxito', id: reporte.idString });
     } else {
-      // Fallback a MEMORIA para que aparezca en el feed aunque no haya DB
-      if (whatsappFeeds[nuevoReporte.grupo]) {
-        whatsappFeeds[nuevoReporte.grupo].unshift({
-          time: 'Ahora',
-          sender: nuevoReporte.reportadoPor,
-          body: nuevoReporte.mensaje,
-          tags: [nuevoReporte.prioridad, 'Móvil'],
-          color: nuevoReporte.prioridad === 'Alta' ? '#f87171' : '#fbbf24',
-          category: nuevoReporte.categoria,
-          estado: nuevoReporte.estado,
-          lat: nuevoReporte.lat,
-
-          lng: nuevoReporte.lng
-        });
-      }
-      
-      // También agregar a la lista general de reportes en memoria
+      // También agregar a la lista general de reportes en memoria si no hay DB
       whatsappReportes.unshift({
         id: id,
         ...nuevoReporte,
